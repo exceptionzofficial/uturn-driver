@@ -63,10 +63,9 @@ const HomeScreen = () => {
   const bannerAnim = useRef(new Animated.Value(0)).current;
   const sectionTitleAnim = useRef(new Animated.Value(0)).current;
   const cardAnims = useRef(SERVICES.map(() => new Animated.Value(0))).current;
-  const statsTitleAnim = useRef(new Animated.Value(0)).current;
-  const statsAnims = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
   const walletFabAnim = useRef(new Animated.Value(0)).current;
   const subscriptionFabAnim = useRef(new Animated.Value(0)).current;
+  const switchAnim = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
 
   const bannerRef = useRef(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -117,18 +116,6 @@ const HomeScreen = () => {
       }).start();
     });
 
-    // Stats title
-    Animated.timing(statsTitleAnim, {
-      toValue: 1, duration: 400, delay: 1100, useNativeDriver: true,
-    }).start();
-
-    // Stats cards slide up
-    statsAnims.forEach((anim, i) => {
-      Animated.spring(anim, {
-        toValue: 1, friction: 7, tension: 50, delay: 1200 + i * 120, useNativeDriver: true,
-      }).start();
-    });
-
     // Wallet FAB bounces in
     Animated.spring(walletFabAnim, {
       toValue: 1, friction: 5, tension: 60, delay: 1500, useNativeDriver: true,
@@ -161,6 +148,13 @@ const HomeScreen = () => {
     } else {
       pulseAnim.setValue(1);
     }
+
+    Animated.spring(switchAnim, {
+      toValue: isOnline ? 1 : 0,
+      friction: 8,
+      tension: 50,
+      useNativeDriver: true,
+    }).start();
   }, [isOnline]);
 
   const requestLocationPermission = async () => {
@@ -271,25 +265,75 @@ const HomeScreen = () => {
               </View>
             </View>
             <View style={styles.headerRight}>
-              {/* Minimal Online Toggle */}
+              {/* Creative 'Beacon' Status Toggle */}
               <TouchableOpacity
-                style={[styles.onlineToggleSmall, isOnline && styles.onlineToggleSmallActive]}
                 onPress={() => setIsOnline(!isOnline)}
-                activeOpacity={0.8}
+                activeOpacity={0.9}
+                style={styles.beaconToggleContainer}
               >
                 <Animated.View style={[
-                  styles.pulseOnline,
-                  isOnline && { transform: [{ scale: pulseAnim }] }
+                  styles.beaconTrack,
+                  {
+                    backgroundColor: switchAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['rgba(0,0,0,0.1)', 'rgba(76, 175, 80, 0.25)']
+                    }),
+                    borderColor: isOnline ? COLORS.accent : 'rgba(0,0,0,0.1)',
+                  }
                 ]}>
-                  <View style={[styles.dotSmall, isOnline ? { backgroundColor: COLORS.accent } : { backgroundColor: COLORS.textMuted }]} />
+                  {/* Status Text (Sliding) */}
+                  <Animated.View style={[
+                    styles.beaconLabels,
+                    {
+                      transform: [{
+                        translateX: switchAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [15, -15],
+                        })
+                      }]
+                    }
+                  ]}>
+                    <Text style={[styles.beaconText, { color: isOnline ? COLORS.accent : COLORS.textMuted }]}>
+                      {isOnline ? 'LIVE' : 'SLEEP'}
+                    </Text>
+                  </Animated.View>
+
+                  {/* Morphing Thumb */}
+                  <Animated.View style={[
+                    styles.beaconThumb,
+                    {
+                      backgroundColor: isOnline ? COLORS.accent : COLORS.white,
+                      transform: [{
+                        translateX: switchAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-24, 24],
+                        })
+                      }],
+                      shadowColor: isOnline ? COLORS.accent : '#000',
+                    }
+                  ]}>
+                    <Icon 
+                      name={isOnline ? 'signal-variant' : 'power-off'} 
+                      size={18} 
+                      color={isOnline ? COLORS.white : COLORS.textMuted} 
+                    />
+                    
+                    {/* Radar Effect when Online */}
+                    {isOnline && (
+                      <Animated.View style={[
+                        styles.radarCircle,
+                        { transform: [{ scale: pulseAnim }], opacity: pulseAnim.interpolate({ inputRange: [1, 1.15], outputRange: [0.6, 0] }) }
+                      ]} />
+                    )}
+                  </Animated.View>
                 </Animated.View>
-                <Text style={[styles.onlineStatusText, isOnline && { color: COLORS.secondary }]}>
-                  {isOnline ? 'ONLINE' : 'OFFLINE'}
-                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.profileCircle}>
-                <Icon name="account" size={24} color={COLORS.white} />
+                <Image 
+                  source={{ uri: 'https://i.pravatar.cc/250?img=67' }} 
+                  style={styles.profileImage} 
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -384,39 +428,6 @@ const HomeScreen = () => {
             {SERVICES.map((item, index) => renderServiceCard(item, index))}
           </View>
 
-          {/* Stats title - fades in */}
-          <Animated.View style={{
-            opacity: statsTitleAnim,
-            transform: [{ translateY: statsTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-          }}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Today's Summary</Text>
-            </View>
-          </Animated.View>
-
-          {/* Stats cards - slide up individually */}
-          <View style={styles.statsRow}>
-            {[
-              { icon: 'road-variant', color: COLORS.accent, value: '0', label: 'Trips' },
-              { icon: 'currency-inr', color: COLORS.accentOrange, value: '₹0', label: 'Earned' },
-              { icon: 'clock-outline', color: COLORS.info, value: '0h', label: 'Online' },
-            ].map((stat, i) => (
-              <Animated.View key={i} style={{
-                flex: 1,
-                opacity: statsAnims[i],
-                transform: [
-                  { translateY: statsAnims[i].interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-                  { scale: statsAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
-                ],
-              }}>
-                <View style={styles.statCard}>
-                  <Icon name={stat.icon} size={22} color={stat.color} />
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              </Animated.View>
-            ))}
-          </View>
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -572,19 +583,64 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  onlineStatusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.secondary,
-    opacity: 0.7,
+  beaconToggleContainer: {
+    marginRight: 12,
   },
-  profileCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+  beaconTrack: {
+    width: 90,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  beaconThumb: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    zIndex: 5,
+  },
+  beaconLabels: {
+    position: 'absolute',
+    width: '100%',
+    alignItems: 'center',
+  },
+  beaconText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontStyle: 'italic',
+  },
+  radarCircle: {
+    position: 'absolute',
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  profileCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
   },
   locationBar: {
     flexDirection: 'row',
@@ -806,33 +862,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  /* Stats */
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 20,
-    marginHorizontal: 5,
-    ...SHADOW.light,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: COLORS.text,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    marginTop: 4,
-  },
 
   /* Map Modal */
   mapContainer: {

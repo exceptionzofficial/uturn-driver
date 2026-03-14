@@ -12,6 +12,7 @@ import HomeScreen from './src/screens/main/HomeScreen';
 import MyTaskScreen from './src/screens/main/MyTaskScreen';
 import VideoVerificationScreen from './src/screens/main/VideoVerificationScreen';
 import ActiveRideScreen from './src/screens/main/ActiveRideScreen';
+import ProfileScreen from './src/screens/main/ProfileScreen';
 import { COLORS, SHADOW } from './src/theme/AppTheme';
 
 const Stack = createNativeStackNavigator();
@@ -104,7 +105,7 @@ const MainTabs = () => {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="MyTask" component={MyTaskScreen} />
       <Tab.Screen name="Payment" component={HomeScreen} />
-      <Tab.Screen name="Profile" component={HomeScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };

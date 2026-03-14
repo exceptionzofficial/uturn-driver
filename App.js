@@ -50,7 +50,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             let iconName;
             let label;
             if (route.name === 'Home') { iconName = 'home'; label = 'Home'; }
-            else if (route.name === 'MyTask') { iconName = 'clipboard-text-outline'; label = 'Tasks'; }
+            else if (route.name === 'MyTask') { iconName = 'car'; label = 'Trips'; }
             else if (route.name === 'Payment') { iconName = 'history'; label = 'History'; }
             else if (route.name === 'Profile') { iconName = 'account-outline'; label = 'Profile'; }
 
@@ -186,11 +186,31 @@ const App = () => {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
-          <Stack.Screen name="Splash" component={SplashScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="VideoVerification" component={VideoVerificationScreen} />
-          <Stack.Screen name="ActiveRide" component={ActiveRideScreen} />
+          <Stack.Screen 
+            name="Splash" 
+            component={SplashScreen} 
+            options={{ animation: 'fade' }} 
+          />
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen} 
+            options={{ animation: 'slide_from_right', animationDuration: 400 }} 
+          />
+          <Stack.Screen 
+            name="MainTabs" 
+            component={MainTabs} 
+            options={{ animation: 'fade_from_bottom' }} 
+          />
+          <Stack.Screen 
+            name="VideoVerification" 
+            component={VideoVerificationScreen} 
+            options={{ animation: 'slide_from_bottom' }} 
+          />
+          <Stack.Screen 
+            name="ActiveRide" 
+            component={ActiveRideScreen} 
+            options={{ animation: 'flip' }} 
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

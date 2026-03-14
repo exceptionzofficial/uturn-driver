@@ -4,6 +4,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   SafeAreaView,
@@ -17,6 +18,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
+import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import { getAddressFromCoords } from '../../services/api';
 
@@ -27,12 +29,21 @@ const SERVICES = [
   { id: '1', label: 'Job', image: require('../../assets/job.png'), color: '#4CAF50' },
   { id: '2', label: 'Buy / Sell', image: require('../../assets/Vehicle.png'), color: '#2196F3' },
   { id: '3', label: 'Expense', image: require('../../assets/money.png'), color: '#FF5722' },
-  { id: '4', label: 'Loan', icon: 'cash-multiple', color: '#9C27B0' },
-  { id: '5', label: 'Insurance', icon: 'shield-check-outline', color: '#00BCD4' },
-  { id: '6', label: 'Referral', icon: 'account-group-outline', color: '#FF9800' },
-  { id: '8', label: 'My Earnings', icon: 'chart-line', color: '#8BC34A' },
-  { id: '9', label: 'Self Drive', image: require('../../assets/Vehicle.png'), color: '#607D8B' },
+  { id: '4', label: 'Loan', image: require('../../assets/loan.png'), color: '#9C27B0' },
+  { id: '5', label: 'Insurance', image: require('../../assets/insurance.png'), color: '#00BCD4' },
+  { id: '6', label: 'Referral', image: require('../../assets/referral.png'), color: '#FF9800' },
+  { id: '8', label: 'My Earnings', image: require('../../assets/earning.png'), color: '#8BC34A' },
+  { id: '9', label: 'Self Drive', image: require('../../assets/selfdrive.png'), color: '#607D8B' },
 ];
+
+const BANNERS = [
+  { id: '1', image: require('../../assets/banner1.jpg') },
+  { id: '2', image: require('../../assets/banner2.jpg') }, // Placeholder: Update these when you add more files
+  { id: '3', image: require('../../assets/banner3.jpg') },
+  { id: '4', image: require('../../assets/banner5.jpg') },
+];
+
+const BANNER_WIDTH = width - SPACING.lg * 2;
 
 const HomeScreen = () => {
   const [locationName, setLocationName] = useState('Locating...');
@@ -46,9 +57,88 @@ const HomeScreen = () => {
   const [showMap, setShowMap] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // --- Entrance Animations ---
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const locationBarAnim = useRef(new Animated.Value(0)).current;
+  const bannerAnim = useRef(new Animated.Value(0)).current;
+  const sectionTitleAnim = useRef(new Animated.Value(0)).current;
+  const cardAnims = useRef(SERVICES.map(() => new Animated.Value(0))).current;
+  const statsTitleAnim = useRef(new Animated.Value(0)).current;
+  const statsAnims = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  const walletFabAnim = useRef(new Animated.Value(0)).current;
+  const subscriptionFabAnim = useRef(new Animated.Value(0)).current;
+
+  const bannerRef = useRef(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let nextIndex = activeBannerIndex + 1;
+      if (nextIndex >= BANNERS.length) {
+        nextIndex = 0;
+      }
+      bannerRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setActiveBannerIndex(nextIndex);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeBannerIndex]);
+
   useEffect(() => {
     requestLocationPermission();
+    startEntranceAnimations();
   }, []);
+
+  const startEntranceAnimations = () => {
+    // Header slides down
+    Animated.spring(headerAnim, {
+      toValue: 1, friction: 8, tension: 40, useNativeDriver: true,
+    }).start();
+
+    // Location bar slides in from right
+    Animated.timing(locationBarAnim, {
+      toValue: 1, duration: 500, delay: 200, useNativeDriver: true,
+    }).start();
+
+    // Banner scales up
+    Animated.spring(bannerAnim, {
+      toValue: 1, friction: 6, tension: 50, delay: 350, useNativeDriver: true,
+    }).start();
+
+    // "Services" title fades in
+    Animated.timing(sectionTitleAnim, {
+      toValue: 1, duration: 400, delay: 450, useNativeDriver: true,
+    }).start();
+
+    // Service cards pop in one by one
+    cardAnims.forEach((anim, i) => {
+      Animated.spring(anim, {
+        toValue: 1, friction: 6, tension: 60, delay: 500 + i * 80, useNativeDriver: true,
+      }).start();
+    });
+
+    // Stats title
+    Animated.timing(statsTitleAnim, {
+      toValue: 1, duration: 400, delay: 1100, useNativeDriver: true,
+    }).start();
+
+    // Stats cards slide up
+    statsAnims.forEach((anim, i) => {
+      Animated.spring(anim, {
+        toValue: 1, friction: 7, tension: 50, delay: 1200 + i * 120, useNativeDriver: true,
+      }).start();
+    });
+
+    // Wallet FAB bounces in
+    Animated.spring(walletFabAnim, {
+      toValue: 1, friction: 5, tension: 60, delay: 1500, useNativeDriver: true,
+    }).start();
+
+    // Subscription FAB bounces in
+    Animated.spring(subscriptionFabAnim, {
+      toValue: 1, friction: 5, tension: 60, delay: 1600, useNativeDriver: true,
+    }).start();
+  };
 
   useEffect(() => {
     if (isOnline) {
@@ -118,171 +208,303 @@ const HomeScreen = () => {
     );
   };
 
-  const renderServiceCard = (item) => (
-    <TouchableOpacity key={item.id} style={styles.serviceCard} activeOpacity={0.7}>
-      <View style={styles.iconContainer}>
-        {item.image ? (
-          <Image source={item.image} style={styles.serviceIconImage} resizeMode="contain" />
-        ) : (
-          <Icon name={item.icon} size={40} color={item.color} />
-        )}
-      </View>
-      <Text style={styles.serviceLabel} numberOfLines={2}>{item.label}</Text>
-    </TouchableOpacity>
-  );
+  const renderServiceCard = (item, index) => {
+    const anim = cardAnims[index] || new Animated.Value(1);
+    return (
+      <Animated.View
+        key={item.id}
+        style={{
+          opacity: anim,
+          transform: [
+            { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) },
+            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) },
+          ],
+        }}
+      >
+        <TouchableOpacity
+          style={[styles.serviceCard, { borderColor: item.color + '40' }]}
+          activeOpacity={0.7}
+        >
+          <View style={styles.iconContainer}>
+            {item.image ? (
+              <Image source={item.image} style={styles.serviceIconImage} resizeMode="contain" />
+            ) : (
+              <Icon name={item.icon} size={40} color={item.color} />
+            )}
+          </View>
+          <Text style={styles.serviceLabel} numberOfLines={2}>{item.label}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.primary} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.brandRow}>
-            <Image
-              source={require('../../assets/logo.png')}
-              style={styles.logoImg}
-              resizeMode="contain"
-            />
-            <View>
-              <Text style={styles.brandText}>UTURN</Text>
-              <Text style={styles.tagline}>Moving Business Forward</Text>
+      {/* Dynamic Background Design */}
+      <LinearGradient
+        colors={['#FFFFFF', '#F8F5EF', '#F0F4F8']}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Decorative Blobs */}
+      <View style={styles.bgBlob1} />
+      <View style={styles.bgBlob2} />
+
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header - slides down */}
+        <Animated.View style={[styles.header, {
+          opacity: headerAnim,
+          transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-60, 0] }) }],
+        }]}>
+          <View style={styles.headerTop}>
+            <View style={styles.brandRow}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+              <View>
+                <Text style={styles.brandText}>UTURN</Text>
+                <Text style={styles.tagline}>Moving Business Forward</Text>
+              </View>
+            </View>
+            <View style={styles.headerRight}>
+              {/* Minimal Online Toggle */}
+              <TouchableOpacity
+                style={[styles.onlineToggleSmall, isOnline && styles.onlineToggleSmallActive]}
+                onPress={() => setIsOnline(!isOnline)}
+                activeOpacity={0.8}
+              >
+                <Animated.View style={[
+                  styles.pulseOnline,
+                  isOnline && { transform: [{ scale: pulseAnim }] }
+                ]}>
+                  <View style={[styles.dotSmall, isOnline ? { backgroundColor: COLORS.accent } : { backgroundColor: COLORS.textMuted }]} />
+                </Animated.View>
+                <Text style={[styles.onlineStatusText, isOnline && { color: COLORS.secondary }]}>
+                  {isOnline ? 'ONLINE' : 'OFFLINE'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.profileCircle}>
+                <Icon name="account" size={24} color={COLORS.white} />
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.headerRight}>
-            {/* Minimal Online Toggle */}
-            <TouchableOpacity
-              style={[styles.onlineToggleSmall, isOnline && styles.onlineToggleSmallActive]}
-              onPress={() => setIsOnline(!isOnline)}
-              activeOpacity={0.8}
-            >
-              <Animated.View style={[
-                styles.pulseOnline,
-                isOnline && { transform: [{ scale: pulseAnim }] }
-              ]}>
-                <View style={[styles.dotSmall, isOnline ? { backgroundColor: COLORS.accent } : { backgroundColor: COLORS.textMuted }]} />
-              </Animated.View>
-              <Text style={[styles.onlineStatusText, isOnline && { color: COLORS.secondary }]}>
-                {isOnline ? 'ONLINE' : 'OFFLINE'}
-              </Text>
-            </TouchableOpacity>
+        </Animated.View>
 
-            <TouchableOpacity style={styles.profileCircle}>
-              <Icon name="account" size={24} color={COLORS.white} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Location Bar */}
-        <TouchableOpacity
-          style={styles.locationBar}
-          onPress={() => setShowMap(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.locationIcon}>
-            <Icon name="map-marker" size={20} color={COLORS.accentRed} />
-          </View>
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationLabel}>Current Location</Text>
-            <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
-          </View>
-          <Icon name="chevron-right" size={22} color={COLORS.textMuted} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-
-        {/* Banner Placeholder */}
-        <View style={[styles.bannerCard, { marginTop: 10 }]}>
-          <View style={styles.bannerPlaceholder}>
-            <Icon name="image-outline" size={40} color={COLORS.border} />
-            <Text style={styles.bannerPlaceholderText}>Promotional Banner</Text>
-          </View>
-        </View>
-
-        {/* Services Grid */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Services</Text>
-          <TouchableOpacity>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.servicesGrid}>
-          {SERVICES.map(renderServiceCard)}
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Today's Summary</Text>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Icon name="road-variant" size={22} color={COLORS.accent} />
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Trips</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Icon name="currency-inr" size={22} color={COLORS.accentOrange} />
-            <Text style={styles.statValue}>₹0</Text>
-            <Text style={styles.statLabel}>Earned</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Icon name="clock-outline" size={22} color={COLORS.info} />
-            <Text style={styles.statValue}>0h</Text>
-            <Text style={styles.statLabel}>Online</Text>
-          </View>
-        </View>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Floating Wallet Button */}
-      <TouchableOpacity style={styles.walletFab} activeOpacity={0.8}>
-        <Icon name="wallet" size={28} color={COLORS.white} />
-        <Text style={styles.walletFabLabel}>Wallet</Text>
-      </TouchableOpacity>
-
-      {/* Map Modal */}
-      <Modal visible={showMap} animationType="slide">
-        <View style={styles.mapContainer}>
-          <MapView
-            provider={PROVIDER_GOOGLE}
-            style={styles.map}
-            region={region}
-            showsUserLocation={true}
-          >
-            <Marker coordinate={region} />
-          </MapView>
+        {/* Location Bar - slides from right (placed between header and scroll) */}
+        <Animated.View style={{
+          opacity: locationBarAnim,
+          transform: [{ translateX: locationBarAnim.interpolate({ inputRange: [0, 1], outputRange: [80, 0] }) }],
+          marginTop: -28,
+          marginHorizontal: SPACING.lg,
+          zIndex: 20,
+        }}>
           <TouchableOpacity
-            style={styles.closeMapBtn}
-            onPress={() => setShowMap(false)}
+            style={styles.locationBar}
+            onPress={() => setShowMap(true)}
+            activeOpacity={0.8}
           >
-            <Icon name="close" size={26} color={COLORS.black} />
+            <View style={styles.locationIcon}>
+              <Icon name="map-marker" size={20} color={COLORS.accentRed} />
+            </View>
+            <View style={styles.locationInfo}>
+              <Text style={styles.locationLabel}>Current Location</Text>
+              <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
+            </View>
+            <Icon name="chevron-right" size={22} color={COLORS.textMuted} />
           </TouchableOpacity>
-          <View style={styles.mapInfoCard}>
-            <Text style={styles.mapAddressTitle}>Selected Location</Text>
-            <Text style={styles.mapAddressText}>{locationName}</Text>
+        </Animated.View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+
+          {/* Auto-Scrolling Banners */}
+          <Animated.View style={{
+            opacity: bannerAnim,
+            transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+            marginTop: 10,
+          }}>
+            <FlatList
+              ref={bannerRef}
+              data={BANNERS}
+              keyExtractor={(item) => item.id}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScrollToIndexFailed={() => { }}
+              renderItem={({ item }) => (
+                <View style={[styles.bannerCard, { width: BANNER_WIDTH }]}>
+                  <Image
+                    source={item.image}
+                    style={styles.bannerImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              )}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
+                setActiveBannerIndex(index);
+              }}
+            />
+            {/* Banner Pagination Dots */}
+            <View style={styles.bannerDotsContainer}>
+              {BANNERS.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.bannerDot,
+                    activeBannerIndex === i && styles.bannerDotActive
+                  ]}
+                />
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Services title - fades in */}
+          <Animated.View style={{
+            opacity: sectionTitleAnim,
+            transform: [{ translateX: sectionTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] }) }],
+          }}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Services</Text>
+              <TouchableOpacity>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
+          {/* Service cards - pop in individually */}
+          <View style={styles.servicesGrid}>
+            {SERVICES.map((item, index) => renderServiceCard(item, index))}
+          </View>
+
+          {/* Stats title - fades in */}
+          <Animated.View style={{
+            opacity: statsTitleAnim,
+            transform: [{ translateY: statsTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+          }}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Today's Summary</Text>
+            </View>
+          </Animated.View>
+
+          {/* Stats cards - slide up individually */}
+          <View style={styles.statsRow}>
+            {[
+              { icon: 'road-variant', color: COLORS.accent, value: '0', label: 'Trips' },
+              { icon: 'currency-inr', color: COLORS.accentOrange, value: '₹0', label: 'Earned' },
+              { icon: 'clock-outline', color: COLORS.info, value: '0h', label: 'Online' },
+            ].map((stat, i) => (
+              <Animated.View key={i} style={{
+                flex: 1,
+                opacity: statsAnims[i],
+                transform: [
+                  { translateY: statsAnims[i].interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+                  { scale: statsAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
+                ],
+              }}>
+                <View style={styles.statCard}>
+                  <Icon name={stat.icon} size={22} color={stat.color} />
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              </Animated.View>
+            ))}
+          </View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+
+        {/* Floating Subscription Button - bounces in */}
+        <Animated.View style={{
+          opacity: subscriptionFabAnim,
+          transform: [
+            { scale: subscriptionFabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
+            { translateY: subscriptionFabAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) },
+          ],
+        }}>
+          <TouchableOpacity style={styles.subscriptionFab} activeOpacity={0.8}>
+            <Icon name="card-membership" size={28} color={COLORS.white} />
+            <Text style={styles.subscriptionFabLabel}>Plan</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Floating Wallet Button - bounces in */}
+        <Animated.View style={{
+          opacity: walletFabAnim,
+          transform: [
+            { scale: walletFabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
+            { translateY: walletFabAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) },
+          ],
+        }}>
+          <TouchableOpacity style={styles.walletFab} activeOpacity={0.8}>
+            <Icon name="wallet" size={28} color={COLORS.white} />
+            <Text style={styles.walletFabLabel}>Wallet</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Map Modal */}
+        <Modal visible={showMap} animationType="slide">
+          <View style={styles.mapContainer}>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              region={region}
+              showsUserLocation={true}
+            >
+              <Marker coordinate={region} />
+            </MapView>
             <TouchableOpacity
-              style={styles.confirmLocationBtn}
+              style={styles.closeMapBtn}
               onPress={() => setShowMap(false)}
             >
-              <Text style={styles.confirmBtnText}>Confirm Location</Text>
+              <Icon name="close" size={26} color={COLORS.black} />
             </TouchableOpacity>
+            <View style={styles.mapInfoCard}>
+              <Text style={styles.mapAddressTitle}>Selected Location</Text>
+              <Text style={styles.mapAddressText}>{locationName}</Text>
+              <TouchableOpacity
+                style={styles.confirmLocationBtn}
+                onPress={() => setShowMap(false)}
+              >
+                <Text style={styles.confirmBtnText}>Confirm Location</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
+  },
+  bgBlob1: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(245, 197, 24, 0.15)', // UTurn Yellow tint
+  },
+  bgBlob2: {
+    position: 'absolute',
+    top: 250,
+    left: -80,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(3, 169, 244, 0.08)', // Light Blue tint
   },
   header: {
     backgroundColor: COLORS.primary,
@@ -365,10 +587,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   locationBar: {
-    position: 'absolute',
-    bottom: -28,
-    left: SPACING.lg,
-    right: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
@@ -525,6 +743,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 8,
     marginBottom: SPACING.md,
+    borderWidth: 1.5,
     ...SHADOW.light,
   },
   iconContainer: {
@@ -547,10 +766,33 @@ const styles = StyleSheet.create({
 
   /* Banner */
   bannerCard: {
-    height: 140,
+    height: 150,
     marginBottom: SPACING.lg,
     backgroundColor: COLORS.white,
     ...SHADOW.light,
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -20,
+    marginBottom: 20,
+  },
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginHorizontal: 3,
+  },
+  bannerDotActive: {
+    backgroundColor: COLORS.primary,
+    width: 14,
   },
   bannerPlaceholder: {
     flex: 1,
@@ -659,6 +901,26 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   walletFabLabel: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: -2,
+  },
+  subscriptionFab: {
+    position: 'absolute',
+    bottom: 175, // Placed above the wallet fab
+    right: 20,
+    backgroundColor: '#FF9800', // Gold/Orange for subscription
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOW.medium,
+    elevation: 8,
+    zIndex: 100,
+  },
+  subscriptionFabLabel: {
     color: COLORS.white,
     fontSize: 10,
     fontWeight: '800',

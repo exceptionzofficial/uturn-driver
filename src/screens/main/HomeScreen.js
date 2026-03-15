@@ -15,12 +15,15 @@ import {
   Modal,
   Animated,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import { getAddressFromCoords } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+import Loader from '../../components/Loader';
 
 const { width } = Dimensions.get('window');
 const SERVICE_CARD_SIZE = (width - SPACING.lg * 2 - SPACING.md) / 2;
@@ -46,8 +49,9 @@ const BANNERS = [
 const BANNER_WIDTH = width - SPACING.lg * 2;
 
 const HomeScreen = () => {
+  const { isOnline, setIsOnline } = useAppContext();
   const [locationName, setLocationName] = useState('Locating...');
-  const [isOnline, setIsOnline] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [region, setRegion] = useState({
     latitude: 11.3410,
     longitude: 77.7172,
@@ -66,9 +70,11 @@ const HomeScreen = () => {
   const walletFabAnim = useRef(new Animated.Value(0)).current;
   const subscriptionFabAnim = useRef(new Animated.Value(0)).current;
   const switchAnim = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
+  const headerCycleAnim = useRef(new Animated.Value(0)).current;
 
   const bannerRef = useRef(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [showHeaderInfo, setShowHeaderInfo] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -84,8 +90,39 @@ const HomeScreen = () => {
   }, [activeBannerIndex]);
 
   useEffect(() => {
+    const cycleInterval = setInterval(() => {
+      // Step 1: Slide OUT current
+      Animated.timing(headerCycleAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        // Step 2: Toggle content
+        setShowHeaderInfo(prev => !prev);
+        // Step 3: Reset animation value to bottom start
+        headerCycleAnim.setValue(-1);
+        // Step 4: Slide IN new
+        Animated.timing(headerCycleAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000);
+
+    return () => clearInterval(cycleInterval);
+  }, []);
+
+  useEffect(() => {
     requestLocationPermission();
     startEntranceAnimations();
+    
+    // Simulate initial data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const startEntranceAnimations = () => {
@@ -259,9 +296,35 @@ const HomeScreen = () => {
                 style={styles.logoImg}
                 resizeMode="contain"
               />
-              <View>
-                <Text style={styles.brandText}>UTURN</Text>
-                <Text style={styles.tagline}>Moving Business Forward</Text>
+              <View style={styles.brandRowContainer}>
+                <Animated.View style={[
+                  styles.textCycleContainer,
+                  {
+                    opacity: headerCycleAnim.interpolate({
+                      inputRange: [-1, 0, 1],
+                      outputRange: [0, 1, 0],
+                    }),
+                    transform: [{
+                      translateY: headerCycleAnim.interpolate({
+                        inputRange: [-1, 0, 1],
+                        outputRange: [30, 0, -30],
+                      })
+                    }],
+                    position: 'absolute',
+                  }
+                ]}>
+                  {showHeaderInfo ? (
+                    <View>
+                      <Text style={styles.brandText}>UTURN</Text>
+                      <Text style={styles.tagline}>Moving Business Forward</Text>
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={styles.brandText}>MY VEHICLE</Text>
+                      <Text style={styles.tagline}>Maruthi Suzuki Swift</Text>
+                    </View>
+                  )}
+                </Animated.View>
               </View>
             </View>
             <View style={styles.headerRight}>
@@ -312,12 +375,12 @@ const HomeScreen = () => {
                       shadowColor: isOnline ? COLORS.accent : '#000',
                     }
                   ]}>
-                    <Icon 
-                      name={isOnline ? 'signal-variant' : 'power-off'} 
-                      size={18} 
-                      color={isOnline ? COLORS.white : COLORS.textMuted} 
+                    <Icon
+                      name={isOnline ? 'signal-variant' : 'power-off'}
+                      size={18}
+                      color={isOnline ? COLORS.white : COLORS.textMuted}
                     />
-                    
+
                     {/* Radar Effect when Online */}
                     {isOnline && (
                       <Animated.View style={[
@@ -330,9 +393,9 @@ const HomeScreen = () => {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.profileCircle}>
-                <Image 
-                  source={{ uri: 'https://i.pravatar.cc/250?img=67' }} 
-                  style={styles.profileImage} 
+                <Image
+                  source={{ uri: 'https://i.pravatar.cc/250?img=67' }}
+                  style={styles.profileImage}
                 />
               </TouchableOpacity>
             </View>
@@ -353,7 +416,12 @@ const HomeScreen = () => {
             activeOpacity={0.8}
           >
             <View style={styles.locationIcon}>
-              <Icon name="map-marker" size={20} color={COLORS.accentRed} />
+              <LottieView
+                source={require('../../assets/location.json')}
+                autoPlay
+                loop
+                style={{ width: 34, height: 34 }}
+              />
             </View>
             <View style={styles.locationInfo}>
               <Text style={styles.locationLabel}>Current Location</Text>
@@ -441,7 +509,12 @@ const HomeScreen = () => {
           ],
         }}>
           <TouchableOpacity style={styles.subscriptionFab} activeOpacity={0.8}>
-            <Icon name="card-membership" size={28} color={COLORS.white} />
+            <LottieView
+              source={require('../../assets/subscription.json')}
+              autoPlay
+              loop
+              style={{ width: 75, height: 75 }}
+            />
             <Text style={styles.subscriptionFabLabel}>Plan</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -455,7 +528,12 @@ const HomeScreen = () => {
           ],
         }}>
           <TouchableOpacity style={styles.walletFab} activeOpacity={0.8}>
-            <Icon name="wallet" size={28} color={COLORS.white} />
+            <LottieView
+              source={require('../../assets/coin purse.json')}
+              autoPlay
+              loop
+              style={{ width: 75, height: 75 }}
+            />
             <Text style={styles.walletFabLabel}>Wallet</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -490,6 +568,7 @@ const HomeScreen = () => {
           </View>
         </Modal>
       </SafeAreaView>
+      <Loader visible={loading} message="Syncing data..." />
     </View>
   );
 };
@@ -531,7 +610,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: SPACING.md,
   },
+  brandRowContainer: {
+    flex: 1,
+    height: 40,
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
+  },
+  textCycleContainer: {
+    width: '100%',
+  },
   brandRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -654,8 +743,6 @@ const styles = StyleSheet.create({
   locationIcon: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFEBEE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -917,40 +1004,32 @@ const styles = StyleSheet.create({
   },
   walletFab: {
     position: 'absolute',
-    bottom: 100, // Adjusted to sit above the bottom tab navigator
+    bottom: 100,
     right: 20,
-    backgroundColor: '#E91E63', // Keeping the original wallet color
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 85,
+    height: 85,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOW.medium,
-    elevation: 8,
     zIndex: 100,
   },
   walletFabLabel: {
-    color: COLORS.white,
+    color: COLORS.secondary,
     fontSize: 10,
     fontWeight: '800',
     marginTop: -2,
   },
   subscriptionFab: {
     position: 'absolute',
-    bottom: 175, // Placed above the wallet fab
+    bottom: 190, // Adjusted gap to prevent overlap with larger icons
     right: 20,
-    backgroundColor: '#FF9800', // Gold/Orange for subscription
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 85,
+    height: 85,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOW.medium,
-    elevation: 8,
     zIndex: 100,
   },
   subscriptionFabLabel: {
-    color: COLORS.white,
+    color: COLORS.secondary,
     fontSize: 10,
     fontWeight: '800',
     marginTop: -2,

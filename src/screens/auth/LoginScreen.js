@@ -15,13 +15,19 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
+import Loader from '../../components/Loader';
 
 const LoginScreen = ({ navigation }) => {
   const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = () => {
-    // Navigate to Home for now
-    navigation.replace('MainTabs');
+    setLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false);
+      navigation.replace('MainTabs');
+    }, 2000);
   };
 
   return (
@@ -111,6 +117,7 @@ const LoginScreen = ({ navigation }) => {
           </SafeAreaView>
         </LinearGradient>
       </ImageBackground>
+      <Loader visible={loading} message="Logging you in..." />
     </View>
   );
 };

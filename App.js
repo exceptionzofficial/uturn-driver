@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Image, Text, StyleSheet } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -14,11 +15,13 @@ import VideoVerificationScreen from './src/screens/main/VideoVerificationScreen'
 import ActiveRideScreen from './src/screens/main/ActiveRideScreen';
 import ProfileScreen from './src/screens/main/ProfileScreen';
 import { COLORS, SHADOW } from './src/theme/AppTheme';
+import { AppProvider, useAppContext } from './src/context/AppContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
+  const { isOnline } = useAppContext();
   if (!state || !state.routes) return null;
   const insets = useSafeAreaInsets();
   const bottomPadding = insets.bottom > 0 ? insets.bottom : 10; // Extra padding for 3-button nav
@@ -85,10 +88,11 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
       {/* Floating Center Button */}
       <View style={styles.floatingButtonContainer}>
         <TouchableOpacity style={styles.floatingButton} activeOpacity={0.9}>
-          <Image
-            source={require('./src/assets/logo.png')}
-            style={styles.floatingIcon}
-            resizeMode="contain"
+          <LottieView
+            source={isOnline ? require('./src/assets/radar.json') : require('./src/assets/man car.json')}
+            autoPlay
+            loop
+            style={{ width: isOnline ? 95 : 95, height: isOnline ? 95 : 95 }}
           />
         </TouchableOpacity>
       </View>
@@ -157,24 +161,20 @@ const styles = StyleSheet.create({
   },
   floatingButtonContainer: {
     position: 'absolute',
-    top: 0,
+    top: -10,
     left: '50%',
-    marginLeft: -32,
-    width: 64,
-    height: 64,
+    marginLeft: -42.5,
+    width: 85,
+    height: 85,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,
   },
   floatingButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: COLORS.primary,
+    width: 85,
+    height: 85,
     justifyContent: 'center',
     alignItems: 'center',
-    ...SHADOW.medium,
-    elevation: 8,
   },
   floatingIcon: {
     width: 38,
@@ -184,37 +184,39 @@ const styles = StyleSheet.create({
 
 const App = () => {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
-          <Stack.Screen 
-            name="Splash" 
-            component={SplashScreen} 
-            options={{ animation: 'fade' }} 
-          />
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen} 
-            options={{ animation: 'slide_from_right', animationDuration: 400 }} 
-          />
-          <Stack.Screen 
-            name="MainTabs" 
-            component={MainTabs} 
-            options={{ animation: 'fade_from_bottom' }} 
-          />
-          <Stack.Screen 
-            name="VideoVerification" 
-            component={VideoVerificationScreen} 
-            options={{ animation: 'slide_from_bottom' }} 
-          />
-          <Stack.Screen 
-            name="ActiveRide" 
-            component={ActiveRideScreen} 
-            options={{ animation: 'flip' }} 
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <AppProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+            <Stack.Screen
+              name="Splash"
+              component={SplashScreen}
+              options={{ animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ animation: 'slide_from_right', animationDuration: 400 }}
+            />
+            <Stack.Screen
+              name="MainTabs"
+              component={MainTabs}
+              options={{ animation: 'fade_from_bottom' }}
+            />
+            <Stack.Screen
+              name="VideoVerification"
+              component={VideoVerificationScreen}
+              options={{ animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="ActiveRide"
+              component={ActiveRideScreen}
+              options={{ animation: 'flip' }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </AppProvider>
   );
 };
 

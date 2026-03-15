@@ -12,11 +12,13 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
+import Loader from '../../components/Loader';
 
 const { width } = Dimensions.get('window');
 
 const VideoVerificationScreen = ({ navigation, route }) => {
   const [isRecording, setIsRecording] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const intervalRef = useRef(null);
 
@@ -40,7 +42,9 @@ const VideoVerificationScreen = ({ navigation, route }) => {
   const handleRecordPress = () => {
     if (isRecording) {
       setIsRecording(false);
+      setLoading(true);
       setTimeout(() => {
+        setLoading(false);
         navigation.navigate('ActiveRide');
       }, 1500);
     } else {
@@ -89,6 +93,7 @@ const VideoVerificationScreen = ({ navigation, route }) => {
         <Text style={styles.footerTitle}>Mandatory Verification</Text>
         <Text style={styles.footerSubtitle}>This video helps ensure safety for both you and the passenger.</Text>
       </View>
+      <Loader visible={loading} message="Processing video..." />
     </SafeAreaView>
   );
 };

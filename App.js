@@ -11,6 +11,8 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 import HomeScreen from './src/screens/main/HomeScreen';
 import MyTaskScreen from './src/screens/main/MyTaskScreen';
+import TripsScreen from './src/screens/main/TripsScreen';
+import HistoryScreen from './src/screens/main/HistoryScreen';
 import VideoVerificationScreen from './src/screens/main/VideoVerificationScreen';
 import ActiveRideScreen from './src/screens/main/ActiveRideScreen';
 import ProfileScreen from './src/screens/main/ProfileScreen';
@@ -107,8 +109,8 @@ const MainTabs = () => {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="MyTask" component={MyTaskScreen} />
-      <Tab.Screen name="Payment" component={HomeScreen} />
+      <Tab.Screen name="MyTask" component={TripsScreen} />
+      <Tab.Screen name="Payment" component={HistoryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

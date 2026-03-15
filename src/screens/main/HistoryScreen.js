@@ -11,8 +11,10 @@ import {
   StatusBar,
   Platform,
   Animated,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Calendar } from 'react-native-calendars';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import { useAppContext } from '../../context/AppContext';
@@ -20,10 +22,10 @@ import { useAppContext } from '../../context/AppContext';
 const { width } = Dimensions.get('window');
 
 const HISTORY_DATA = [
-  { id: '1', date: 'Today', time: '11:20 AM', amount: '₹320.00', from: 'Town Hall', to: 'Railway Station', distance: '8.4 km', timeTaken: '24 mins' },
-  { id: '2', date: 'Yesterday', time: '06:45 PM', amount: '₹185.50', from: 'Bus Stand', to: 'Hotel Residency', distance: '4.2 km', timeTaken: '12 mins' },
-  { id: '3', date: '23 Oct', time: '02:15 PM', amount: '₹540.00', from: 'Airport', to: 'Saibaba Colony', distance: '12.8 km', timeTaken: '45 mins' },
-  { id: '4', date: '22 Oct', time: '10:30 AM', amount: '₹210.00', from: 'Gandhipuram', to: 'Singanallur', distance: '5.6 km', timeTaken: '18 mins' },
+  { id: '1', date: 'Today', fullDate: '2026-03-15', time: '11:20 AM', amount: '₹320.00', from: 'Town Hall', to: 'Railway Station', distance: '8.4 km', timeTaken: '24 mins' },
+  { id: '2', date: 'Yesterday', fullDate: '2026-03-14', time: '06:45 PM', amount: '₹185.50', from: 'Bus Stand', to: 'Hotel Residency', distance: '4.2 km', timeTaken: '12 mins' },
+  { id: '3', date: '23 Oct', fullDate: '2026-10-23', time: '02:15 PM', amount: '₹540.00', from: 'Airport', to: 'Saibaba Colony', distance: '12.8 km', timeTaken: '45 mins' },
+  { id: '4', date: '22 Oct', fullDate: '2026-10-22', time: '10:30 AM', amount: '₹210.00', from: 'Gandhipuram', to: 'Singanallur', distance: '5.6 km', timeTaken: '18 mins' },
 ];
 
 const HistoryScreen = () => {
@@ -33,6 +35,8 @@ const HistoryScreen = () => {
   const headerCycleAnim = useRef(new Animated.Value(0)).current;
   const switchAnim = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
   const [showHeaderInfo, setShowHeaderInfo] = useState(true);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     const cycleInterval = setInterval(() => {
@@ -61,6 +65,15 @@ const HistoryScreen = () => {
       useNativeDriver: true,
     }).start();
   }, [isOnline]);
+
+  const onDateSelect = (day) => {
+    setSelectedDate(day.dateString);
+    setShowCalendar(false);
+  };
+
+  const filteredHistory = selectedDate 
+    ? HISTORY_DATA.filter(item => item.fullDate === selectedDate)
+    : HISTORY_DATA;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -160,8 +173,15 @@ const HistoryScreen = () => {
               </Animated.View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.calendarBtn}>
-              <Icon name="calendar-range" size={22} color={COLORS.secondary} />
+            <TouchableOpacity 
+              style={[styles.calendarBtn, selectedDate && styles.calendarBtnActive]}
+              onPress={() => setShowCalendar(true)}
+            >
+              <Icon 
+                name={selectedDate ? "calendar-check" : "calendar-range"} 
+                size={22} 
+                color={selectedDate ? COLORS.accent : COLORS.secondary} 
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -206,14 +226,16 @@ const HistoryScreen = () => {
         </LinearGradient>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Activities</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAll}>See All</Text>
+          <Text style={styles.sectionTitle}>
+            {selectedDate ? `Activities on ${selectedDate}` : 'Recent Activities'}
+          </Text>
+          <TouchableOpacity onPress={() => setSelectedDate('')}>
+            <Text style={styles.seeAll}>{selectedDate ? 'Show All' : 'See All'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* History List */}
-        {HISTORY_DATA.map((item) => (
+        {filteredHistory.length > 0 ? filteredHistory.map((item) => (
           <TouchableOpacity key={item.id} style={styles.historyCard} activeOpacity={0.8}>
             <View style={styles.historyCardLeft}>
               <View style={styles.dateIcon}>
@@ -250,10 +272,73 @@ const HistoryScreen = () => {
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+        )) : (
+          <View style={styles.emptyContainer}>
+            <Icon name="calendar-blank-outline" size={60} color={COLORS.textLight} />
+            <Text style={styles.emptyText}>No activities on this day</Text>
+            <Text style={styles.emptySubText}>Try selecting another date</Text>
+          </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Calendar Modal */}
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCalendar(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCalendar(false)}
+        >
+          <View style={styles.calendarContainer}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarTitle}>Select Date</Text>
+              <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                <Icon name="close" size={24} color={COLORS.secondary} />
+              </TouchableOpacity>
+            </View>
+            <Calendar
+              onDayPress={onDateSelect}
+              markedDates={{
+                [selectedDate]: { selected: true, selectedColor: COLORS.primary, selectedTextColor: COLORS.secondary }
+              }}
+              renderArrow={(direction) => (
+                <Icon 
+                  name={direction === 'left' ? 'chevron-left' : 'chevron-right'} 
+                  size={28} 
+                  color={COLORS.secondary} 
+                />
+              )}
+              theme={{
+                backgroundColor: COLORS.white,
+                calendarBackground: COLORS.white,
+                textSectionTitleColor: '#b6c1cd',
+                selectedDayBackgroundColor: COLORS.primary,
+                selectedDayTextColor: COLORS.secondary,
+                todayTextColor: COLORS.accent,
+                dayTextColor: COLORS.secondary,
+                textDisabledColor: '#d9e1e8',
+                dotColor: COLORS.primary,
+                selectedDotColor: COLORS.secondary,
+                arrowColor: COLORS.secondary,
+                monthTextColor: COLORS.secondary,
+                indicatorColor: COLORS.secondary,
+                textDayFontWeight: '600',
+                textMonthFontWeight: '900',
+                textDayHeaderFontWeight: '700',
+                textDayFontSize: 14,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 12
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -317,6 +402,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  calendarBtnActive: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.2)',
   },
   beaconToggleContainer: {
     marginRight: 10,
@@ -529,6 +619,47 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     fontWeight: '800',
     marginLeft: 3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+  },
+  calendarContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+    ...SHADOW.medium,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  calendarTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.secondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.secondary,
+    marginTop: 15,
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 5,
   },
 });
 

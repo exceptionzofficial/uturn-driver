@@ -14,6 +14,8 @@ import {
   PermissionsAndroid,
   Modal,
   Animated,
+  PanResponder,
+  Alert,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -59,7 +61,11 @@ const HomeScreen = () => {
     longitudeDelta: 0.01,
   });
   const [showMap, setShowMap] = useState(false);
+  const [incomingBooking, setIncomingBooking] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const slideX = useRef(new Animated.Value(0)).current;
 
   // --- Entrance Animations ---
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -165,8 +171,9 @@ const HomeScreen = () => {
   };
 
   useEffect(() => {
+    let pulse;
     if (isOnline) {
-      const pulse = Animated.loop(
+      pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.15,
@@ -181,7 +188,6 @@ const HomeScreen = () => {
         ]),
       );
       pulse.start();
-      return () => pulse.stop();
     } else {
       pulseAnim.setValue(1);
     }
@@ -192,7 +198,63 @@ const HomeScreen = () => {
       tension: 50,
       useNativeDriver: true,
     }).start();
+
+    // Trigger simulation when going online
+    let simulationTimer;
+    if (isOnline) {
+      simulationTimer = setTimeout(() => {
+        setIncomingBooking({
+          id: 'UT-7842',
+          pickup: 'Town Hall, Coimbatore',
+          drop: 'Railway Station, Erode',
+          type: 'One Way',
+          vehicle: 'Premium Sedan',
+          distance: '94.5 km',
+          fare: {
+            base: '1200',
+            distance: '950',
+            bata: '150',
+            total: '2300'
+          }
+        });
+      }, 3500);
+    } else {
+      setIncomingBooking(null);
+    }
+
+    return () => {
+      if (pulse) pulse.stop();
+      if (simulationTimer) clearTimeout(simulationTimer);
+    };
   }, [isOnline]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx >= 0 && gestureState.dx <= width - 120) {
+          slideX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx >= width - 150) {
+          // Slide successful
+          setShowConfirmModal(true);
+          Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        } else {
+          Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  const handleAcceptBooking = () => {
+    setShowConfirmModal(false);
+    setIncomingBooking(null);
+    Alert.alert('Booking Accepted!', 'The trip is now assigned to you. Drive safe!', [
+      { text: 'Got it', onPress: () => {} }
+    ]);
+  };
 
   const requestLocationPermission = async () => {
     if (Platform.OS === 'android') {
@@ -569,6 +631,121 @@ const HomeScreen = () => {
         </Modal>
       </SafeAreaView>
       <Loader visible={loading} message="Syncing data..." />
+
+      {/* Booking Notification Modal */}
+      <Modal
+        visible={!!incomingBooking}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.bookingModalOverlay}>
+          <View style={styles.bookingCard}>
+            <View style={styles.bookingHeader}>
+              <View style={styles.bookingBadge}>
+                <Text style={styles.bookingBadgeText}>NEW RIDE REQUEST</Text>
+              </View>
+              <Text style={styles.bookingId}>#{incomingBooking?.id}</Text>
+            </View>
+
+            <View style={styles.rideInfoContainer}>
+              <View style={styles.routeTrace}>
+                <View style={[styles.dot, { backgroundColor: COLORS.accent }]} />
+                <View style={styles.line} />
+                <View style={[styles.dot, { backgroundColor: COLORS.accentRed }]} />
+              </View>
+              <View style={styles.addressContainer}>
+                <View style={styles.addressItem}>
+                  <Text style={styles.addressLabel}>Pickup</Text>
+                  <Text style={styles.addressValue} numberOfLines={1}>{incomingBooking?.pickup}</Text>
+                </View>
+                <View style={[styles.addressItem, { marginTop: 25 }]}>
+                  <Text style={styles.addressLabel}>Drop</Text>
+                  <Text style={styles.addressValue} numberOfLines={1}>{incomingBooking?.drop}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.rideDetailsRow}>
+              <View style={styles.detailItem}>
+                <Icon name="car-back" size={20} color={COLORS.textMuted} />
+                <Text style={styles.detailValue}>{incomingBooking?.vehicle}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Icon name="map-marker-distance" size={20} color={COLORS.textMuted} />
+                <Text style={styles.detailValue}>{incomingBooking?.distance}</Text>
+              </View>
+            </View>
+
+            {/* Fare Breakdown (from Vendor App analysis) */}
+            <View style={styles.fareContainer}>
+              <Text style={styles.fareTitle}>Estimated Fare Breakdown</Text>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Base Fare</Text>
+                <Text style={styles.fareValue}>₹{incomingBooking?.fare.base}</Text>
+              </View>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Distance Charge</Text>
+                <Text style={styles.fareValue}>₹{incomingBooking?.fare.distance}</Text>
+              </View>
+              <View style={styles.fareRow}>
+                <Text style={styles.fareLabel}>Driver Bata</Text>
+                <Text style={styles.fareValue}>₹{incomingBooking?.fare.bata}</Text>
+              </View>
+              <View style={styles.fareDivider} />
+              <View style={styles.fareRow}>
+                <Text style={styles.totalLabel}>Total Earning</Text>
+                <Text style={styles.totalValue}>₹{incomingBooking?.fare.total}</Text>
+              </View>
+            </View>
+
+            {/* Slide to Accept */}
+            <View style={styles.slideActionContainer}>
+              <View style={styles.slideBackground}>
+                <Text style={styles.slideText}>Slide to Accept Ride</Text>
+                <Animated.View 
+                  style={[styles.slideThumb, { transform: [{ translateX: slideX }] }]}
+                  {...panResponder.panHandlers}
+                >
+                  <Icon name="chevron-double-right" size={24} color={COLORS.white} />
+                </Animated.View>
+              </View>
+              <TouchableOpacity 
+                style={styles.declineBtn}
+                onPress={() => setIncomingBooking(null)}
+              >
+                <Text style={styles.declineText}>Decline Ride</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal visible={showConfirmModal} transparent={true} animationType="fade">
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox}>
+            <View style={styles.confirmIconCircle}>
+              <Icon name="help-circle-outline" size={40} color={COLORS.primary} />
+            </View>
+            <Text style={styles.confirmTitle}>Confirm Acceptance</Text>
+            <Text style={styles.confirmDesc}>Are you sure you want to accept this ride? You will be expected at the pickup location shortly.</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity 
+                style={[styles.confirmBtn, styles.cancelBtn]} 
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmBtn, styles.acceptBtn]}
+                onPress={handleAcceptBooking}
+              >
+                <Text style={styles.acceptBtnText}>Accept Ride</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -756,6 +933,253 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  locationValue: {
+    fontSize: 13,
+    color: COLORS.secondary,
+    fontWeight: '700',
+    flex: 1,
+  },
+  // Booking Modal Styles
+  bookingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  bookingCard: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: SPACING.lg,
+    paddingBottom: Platform.OS === 'ios' ? 40 : SPACING.lg,
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  bookingBadge: {
+    backgroundColor: COLORS.accent + '20',
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  bookingBadgeText: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  bookingId: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  rideInfoContainer: {
+    flexDirection: 'row',
+    marginBottom: 25,
+  },
+  routeTrace: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 15,
+  },
+  line: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#EEE',
+    marginVertical: 4,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  addressContainer: {
+    flex: 1,
+  },
+  addressItem: {
+    justifyContent: 'center',
+  },
+  addressLabel: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  addressValue: {
+    fontSize: 16,
+    color: COLORS.secondary,
+    fontWeight: '800',
+  },
+  rideDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#F0F0F0',
+    paddingVertical: 15,
+    marginBottom: 20,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailValue: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.secondary,
+  },
+  fareContainer: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 25,
+  },
+  fareTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.secondary,
+    marginBottom: 12,
+    opacity: 0.6,
+  },
+  fareRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  fareLabel: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  fareValue: {
+    fontSize: 14,
+    color: COLORS.secondary,
+    fontWeight: '700',
+  },
+  fareDivider: {
+    height: 1,
+    backgroundColor: '#EEE',
+    marginVertical: 10,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: COLORS.secondary,
+  },
+  totalValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.accent,
+  },
+  slideActionContainer: {
+    alignItems: 'center',
+  },
+  slideBackground: {
+    width: '100%',
+    height: 64,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  slideText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '800',
+    opacity: 0.5,
+  },
+  slideThumb: {
+    position: 'absolute',
+    left: 8,
+    width: 50,
+    height: 50,
+    backgroundColor: COLORS.accent,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  declineBtn: {
+    marginTop: 20,
+    padding: 10,
+  },
+  declineText: {
+    color: COLORS.accentRed,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  // Confirm Modal
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  confirmBox: {
+    backgroundColor: COLORS.white,
+    borderRadius: 25,
+    width: '100%',
+    padding: SPACING.xl,
+    alignItems: 'center',
+  },
+  confirmIconCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: COLORS.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  confirmTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: COLORS.secondary,
+    marginBottom: 10,
+  },
+  confirmDesc: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 30,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F0F0F0',
+    marginRight: 10,
+  },
+  cancelBtnText: {
+    color: COLORS.secondary,
+    fontWeight: '800',
+  },
+  acceptBtn: {
+    backgroundColor: COLORS.accent,
+    marginLeft: 10,
+  },
+  acceptBtnText: {
+    color: COLORS.white,
+    fontWeight: '800',
   },
   locationText: {
     fontSize: 14,

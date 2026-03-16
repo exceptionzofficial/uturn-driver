@@ -9,6 +9,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
+import RegisterScreen from './src/screens/auth/RegisterScreen';
+import ActingDriverRegisterScreen from './src/screens/auth/ActingDriverRegisterScreen';
 import HomeScreen from './src/screens/main/HomeScreen';
 import MyTaskScreen from './src/screens/main/MyTaskScreen';
 import TripsScreen from './src/screens/main/TripsScreen';
@@ -214,6 +216,16 @@ const App = () => {
               name="ActiveRide"
               component={ActiveRideScreen}
               options={{ animation: 'flip' }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="ActingDriverRegister"
+              component={ActingDriverRegisterScreen}
+              options={{ animation: 'slide_from_right' }}
             />
           </Stack.Navigator>
         </NavigationContainer>

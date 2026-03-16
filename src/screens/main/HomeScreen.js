@@ -401,9 +401,9 @@ const HomeScreen = () => {
                   {
                     backgroundColor: switchAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: ['rgba(0,0,0,0.1)', 'rgba(76, 175, 80, 0.25)']
+                      outputRange: ['rgba(0,0,0,0.5)', 'rgba(76, 175, 80, 0.8)']
                     }),
-                    borderColor: isOnline ? COLORS.accent : 'rgba(0,0,0,0.1)',
+                    borderColor: isOnline ? COLORS.accent : 'rgba(255,255,255,0.2)',
                   }
                 ]}>
                   {/* Status Text (Sliding) */}
@@ -418,7 +418,7 @@ const HomeScreen = () => {
                       }]
                     }
                   ]}>
-                    <Text style={[styles.beaconText, { color: isOnline ? COLORS.accent : COLORS.textMuted }]}>
+                    <Text style={[styles.beaconText, { color: COLORS.white }]}>
                       {isOnline ? 'LIVE' : 'SLEEP'}
                     </Text>
                   </Animated.View>

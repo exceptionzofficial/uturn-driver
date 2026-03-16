@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -23,6 +23,7 @@ const ProfileScreen = () => {
   const avatarAnim = useRef(new Animated.Value(0)).current;
   const statsTitleAnim = useRef(new Animated.Value(0)).current;
   const statsAnims = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  const [lowRideEnabled, setLowRideEnabled] = useState(false);
 
   useEffect(() => {
     // Start entrance animations
@@ -54,7 +55,7 @@ const ProfileScreen = () => {
         colors={['#FFFFFF', '#F8F5EF', '#F0F4F8']}
         style={StyleSheet.absoluteFill}
       />
-      
+
       {/* Decorative Blobs */}
       <View style={styles.bgBlob1} />
       <View style={styles.bgBlob2} />
@@ -77,18 +78,18 @@ const ProfileScreen = () => {
                 { translateY: avatarAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }
               ]
             }]}>
-              <Image 
-                source={{ uri: 'https://i.pravatar.cc/250?img=67' }} 
+              <Image
+                source={{ uri: 'https://i.pravatar.cc/250?img=67' }}
                 style={styles.avatar}
               />
               <TouchableOpacity style={styles.editBtn}>
                 <Icon name="pencil" size={16} color={COLORS.white} />
               </TouchableOpacity>
             </Animated.View>
-            
+
             <Text style={styles.userName}>Hariprasath G</Text>
             <Text style={styles.userRole}>Premium Driver</Text>
-            
+
             <View style={styles.badgeRow}>
               <View style={[styles.badge, { backgroundColor: '#FFF9C4' }]}>
                 <Icon name="star" size={14} color="#FBC02D" />
@@ -136,6 +137,33 @@ const ProfileScreen = () => {
                 </View>
               </Animated.View>
             ))}
+          </View>
+
+          {/* Ride Settings Section */}
+          <View style={styles.menuContainer}>
+            <Text style={styles.menuSectionTitle}>Ride Settings</Text>
+            <View style={styles.menuItem}>
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.accent + '15' }]}>
+                <Icon name="trending-down" size={22} color={COLORS.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuLabel}>Accept Low Rides</Text>
+                <Text style={styles.menuSubLabel}>Allow requests with lower Rides</Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setLowRideEnabled(!lowRideEnabled)}
+                style={[
+                  styles.switchTrack,
+                  { backgroundColor: lowRideEnabled ? COLORS.accent : '#E0E0E0' }
+                ]}
+              >
+                <View style={[
+                  styles.switchThumb,
+                  { transform: [{ translateX: lowRideEnabled ? 22 : 2 }] }
+                ]} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Quick Actions / Settings */}
@@ -325,8 +353,32 @@ const styles = StyleSheet.create({
   menuLabel: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.text,
+  },
+  menuSubLabel: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  switchTrack: {
+    width: 48,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  switchThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.white,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
 });
 

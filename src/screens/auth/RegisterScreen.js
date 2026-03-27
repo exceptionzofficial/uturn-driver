@@ -75,6 +75,7 @@ const RegisterScreen = ({ navigation, route }) => {
     number: '',
     insuranceExpiry: '',
     fcExpiry: '',
+    permitExpiry: '',
     tripType: 'Passenger',
     vehicleType: 'Sedan',
   });
@@ -162,6 +163,8 @@ const RegisterScreen = ({ navigation, route }) => {
             setVehicleData({...vehicleData, insuranceExpiry: formattedDate});
         } else if (calendarTarget === 'fc') {
             setVehicleData({...vehicleData, fcExpiry: formattedDate});
+        } else if (calendarTarget === 'permit') {
+            setVehicleData({...vehicleData, permitExpiry: formattedDate});
         }
     }
     setShowMonthYearPicker(false);
@@ -252,37 +255,26 @@ const RegisterScreen = ({ navigation, route }) => {
               <View style={styles.divider} />
               
               <Text style={styles.sectionHeading}>KYC Documents</Text>
-              
+
               {renderInputField('Aadhaar Number *', 'card-account-details-outline', personalData.aadhar, (t) => setPersonalData({...personalData, aadhar: t}), '12-digit number', 'number-pad')}
-              
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Aadhaar Card Upload *</Text>
-                <View style={styles.uploadRow}>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.uploadText}>Front Side</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.uploadText}>Back Side</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.fullUploadCard}>
+                  <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                  <Text style={styles.uploadTextLarge}>Upload Aadhaar (Front & Back)</Text>
+                  <Text style={styles.uploadSubText}>Ensure all details are clearly visible</Text>
+                </TouchableOpacity>
               </View>
 
               {renderInputField('Driving Licence No.*', 'badge-account-outline', personalData.licenceNumber, (t) => setPersonalData({...personalData, licenceNumber: t}), 'Enter DL Number')}
               
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Driving Licence Upload *</Text>
-                <View style={styles.uploadRow}>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.uploadText}>Front Side</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.uploadText}>Back Side</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.fullUploadCard}>
+                  <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                  <Text style={styles.uploadTextLarge}>Upload Licence (Front & Back)</Text>
+                  <Text style={styles.uploadSubText}>Capture both sides for verification</Text>
+                </TouchableOpacity>
               </View>
 
               {renderSelectorField('Licence Expiry *', 'calendar-clock-outline', personalData.licenceExpiry, () => {
@@ -300,23 +292,57 @@ const RegisterScreen = ({ navigation, route }) => {
 
               {renderInputField('Vehicle Registration No.*', 'car-cog', vehicleData.number, (t) => setVehicleData({...vehicleData, number: t}), 'e.g. TN 37 AB 1234')}
               
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Trip Type *</Text>
+                <View style={styles.chipRow}>
+                  {['Passenger', 'Load'].map(t => (
+                    <TouchableOpacity 
+                      key={t}
+                      style={[styles.chip, vehicleData.tripType === t && styles.activeChip]}
+                      onPress={() => setVehicleData({...vehicleData, tripType: t, vehicleType: t === 'Passenger' ? 'Sedan' : 'Load'})}
+                    >
+                      <Text style={[styles.chipText, vehicleData.tripType === t && styles.activeChipText]}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {vehicleData.tripType === 'Passenger' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Vehicle Type *</Text>
+                  <View style={styles.chipRow}>
+                    {['Bike', 'Auto', 'Hatchback', 'Sedan', 'SUV'].map(v => (
+                      <TouchableOpacity 
+                        key={v}
+                        style={[styles.choiceChip, vehicleData.vehicleType === v && styles.activeChoiceChip]}
+                        onPress={() => setVehicleData({...vehicleData, vehicleType: v})}
+                      >
+                        <Text style={[styles.choiceText, vehicleData.vehicleType === v && styles.activeChoiceText]}>{v}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               <View style={styles.divider} />
 
                {/* RC SECTION */}
-              <View style={styles.manualEntryHeader}>
-                <Text style={styles.sectionHeading}>RC Details</Text>
-                <TouchableOpacity style={styles.smallUploadBtn}>
-                   <Icon name="upload" size={16} color={COLORS.primary} />
-                   <Text style={styles.smallUploadText}>Upload RC</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>RC Details *</Text>
+                <TouchableOpacity style={styles.fullUploadCard}>
+                  <Icon name="file-document-outline" size={32} color={COLORS.primary} />
+                  <Text style={styles.uploadTextLarge}>Upload RC Document</Text>
+                  <Text style={styles.uploadSubText}>Clear photo of Registration Certificate</Text>
                 </TouchableOpacity>
               </View>
 
               {/* INSURANCE SECTION */}
-              <View style={styles.manualEntryHeader}>
-                <Text style={styles.sectionHeading}>Insurance Policy</Text>
-                <TouchableOpacity style={styles.smallUploadBtn}>
-                   <Icon name="upload" size={16} color={COLORS.primary} />
-                   <Text style={styles.smallUploadText}>Upload Insurance Photocopy</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Insurance Policy *</Text>
+                <TouchableOpacity style={styles.fullUploadCard}>
+                  <Icon name="shield-check-outline" size={32} color={COLORS.primary} />
+                  <Text style={styles.uploadTextLarge}>Upload Insurance Photocopy</Text>
+                  <Text style={styles.uploadSubText}>Valid insurance policy document</Text>
                 </TouchableOpacity>
               </View>
               {renderSelectorField('Insurance Expiry *', 'calendar-star-outline', vehicleData.insuranceExpiry, () => {
@@ -326,22 +352,44 @@ const RegisterScreen = ({ navigation, route }) => {
               }, 'YYYY-MM-DD')}
 
               {/* FC SECTION */}
-              <View style={styles.manualEntryHeader}>
-                <Text style={styles.sectionHeading}>Fitness Certificate (FC)</Text>
-                <TouchableOpacity style={styles.smallUploadBtn}>
-                   <Icon name="upload" size={16} color={COLORS.primary} />
-                   <Text style={styles.smallUploadText}>Upload FC</Text>
-                </TouchableOpacity>
-              </View>
-              {renderSelectorField('FC Expiry Date', 'calendar-check-outline', vehicleData.fcExpiry, () => {
-                setCalendarTarget('fc');
-                setTempYear(CURRENT_YEAR.toString());
-                setShowMonthYearPicker(true);
-              }, 'YYYY-MM-DD')}
+              {vehicleData.vehicleType !== 'Bike' && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Fitness Certificate (FC)</Text>
+                    <TouchableOpacity style={styles.fullUploadCard}>
+                      <Icon name="certificate-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Upload FC Document</Text>
+                      <Text style={styles.uploadSubText}>Current vehicle fitness certificate</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {renderSelectorField('FC Expiry Date', 'calendar-check-outline', vehicleData.fcExpiry, () => {
+                    setCalendarTarget('fc');
+                    setTempYear(CURRENT_YEAR.toString());
+                    setShowMonthYearPicker(true);
+                  }, 'YYYY-MM-DD')}
+                </>
+              )}
 
-<View style={{ height: 20 }} />
+              {/* PERMIT SECTION */}
+              {vehicleData.tripType === 'Passenger' && !['Bike', 'Auto'].includes(vehicleData.vehicleType) && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Vehicle Permit *</Text>
+                    <TouchableOpacity style={styles.fullUploadCard}>
+                      <Icon name="newspaper-variant-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Upload Permit Document</Text>
+                      <Text style={styles.uploadSubText}>Valid state or national permit</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {renderSelectorField('Permit Expiry Date', 'calendar-clock', vehicleData.permitExpiry, () => {
+                    setCalendarTarget('permit');
+                    setTempYear(CURRENT_YEAR.toString());
+                    setShowMonthYearPicker(true);
+                  }, 'YYYY-MM-DD')}
+                </>
+              )}
 
-
+              <View style={{ height: 20 }} />
             </View>
           )}
 
@@ -614,6 +662,55 @@ const styles = StyleSheet.create({
     height: 54,
     paddingHorizontal: SPACING.md,
   },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 5,
+  },
+  chip: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    backgroundColor: '#F0F0F0',
+    marginRight: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+  },
+  activeChip: {
+    backgroundColor: COLORS.secondary,
+    borderColor: COLORS.secondary,
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  activeChipText: {
+    color: COLORS.white,
+  },
+  choiceChip: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
+  activeChoiceChip: {
+    backgroundColor: COLORS.primary + '15',
+    borderColor: COLORS.primary,
+  },
+  choiceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  activeChoiceText: {
+    color: COLORS.primary,
+  },
   disabledInput: {
     backgroundColor: '#F0F0F0',
     borderColor: '#E0E0E0',
@@ -697,14 +794,39 @@ const styles = StyleSheet.create({
   },
   uploadBox: {
     flex: 0.48,
-    height: 90,
-    backgroundColor: '#FFF',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    borderStyle: 'dashed',
+    height: 100,
+    backgroundColor: '#F8F9FA',
     borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: '#EFEFEF',
+    borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fullUploadCard: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#F8F9FA',
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: '#EFEFEF',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 5,
+  },
+  uploadTextLarge: {
+    marginTop: 12,
+    fontSize: 15,
+    color: COLORS.secondary,
+    fontWeight: '800',
+  },
+  uploadSubText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
   uploadText: {
     fontSize: 12,

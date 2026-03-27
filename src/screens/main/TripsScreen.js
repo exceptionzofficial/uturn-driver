@@ -21,16 +21,6 @@ const { width } = Dimensions.get('window');
 
 const TRIPS_DATA = [
   {
-    id: '1',
-    type: 'Scheduled',
-    time: '14:30',
-    date: 'Today, 25 Oct',
-    from: 'P.N. Road, Tiruppur',
-    to: 'Avinashi Road, Coimbatore',
-    amount: '₹450',
-    status: 'Confirmed',
-  },
-  {
     id: '2',
     type: 'Active',
     time: 'Now',
@@ -39,23 +29,13 @@ const TRIPS_DATA = [
     to: 'Bus Stand, Bhavani',
     amount: '₹220',
     status: 'In Progress',
-  },
-  {
-    id: '3',
-    type: 'Scheduled',
-    time: '09:00',
-    date: 'Tomorrow, 26 Oct',
-    from: 'New Bus Stand, Salem',
-    to: 'Steel Plant Road, Salem',
-    amount: '₹180',
-    status: 'Pending',
   }
 ];
 
 const TripsScreen = () => {
   const { isOnline, setIsOnline } = useAppContext();
   const [activeTab, setActiveTab] = useState('Active');
-  const tabs = ['Active', 'Scheduled', 'Invitations'];
+  const tabs = ['Active', 'Invitations'];
 
   // Animations
   const headerCycleAnim = useRef(new Animated.Value(0)).current;

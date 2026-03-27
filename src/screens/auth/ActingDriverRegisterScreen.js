@@ -241,32 +241,22 @@ const ActingDriverRegisterScreen = ({ navigation, route }) => {
         
         <View style={styles.inputGroup}>
             <Text style={styles.label}>Aadhaar Card Upload *</Text>
-            <View style={styles.uploadRow}>
-                <TouchableOpacity style={styles.uploadBox}>
-                <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.uploadText}>Front Side</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.uploadBox}>
-                <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.uploadText}>Back Side</Text>
-                </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.fullUploadCard}>
+                <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                <Text style={styles.uploadTextLarge}>Upload Aadhaar (Front & Back)</Text>
+                <Text style={styles.uploadSubText}>Ensure all details are clearly visible</Text>
+            </TouchableOpacity>
         </View>
 
         {renderInputField('Driving Licence No.*', 'badge-account-outline', formData.licenceNumber, (t) => setFormData({...formData, licenceNumber: t}), 'Enter DL Number')}
         
         <View style={styles.inputGroup}>
             <Text style={styles.label}>Driving Licence Upload *</Text>
-            <View style={styles.uploadRow}>
-                <TouchableOpacity style={styles.uploadBox}>
-                <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.uploadText}>Front Side</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.uploadBox}>
-                <Icon name="camera-plus-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.uploadText}>Back Side</Text>
-                </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.fullUploadCard}>
+                <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                <Text style={styles.uploadTextLarge}>Upload Licence (Front & Back)</Text>
+                <Text style={styles.uploadSubText}>Capture both sides for verification</Text>
+            </TouchableOpacity>
         </View>
 
         {renderSelectorField('Licence Expiry *', 'calendar-clock-outline', formData.licenceExpiry, () => {
@@ -689,6 +679,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 18,
     paddingHorizontal: 10,
+  },
+  fullUploadCard: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#F8F9FA',
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: '#EFEFEF',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 5,
+  },
+  uploadTextLarge: {
+    marginTop: 12,
+    fontSize: 15,
+    color: COLORS.secondary,
+    fontWeight: '800',
+  },
+  uploadSubText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
   stateText: {
     fontSize: 16,

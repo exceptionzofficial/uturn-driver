@@ -82,9 +82,6 @@ const ProfileScreen = () => {
                 source={{ uri: 'https://i.pravatar.cc/250?img=67' }}
                 style={styles.avatar}
               />
-              <TouchableOpacity style={styles.editBtn}>
-                <Icon name="pencil" size={16} color={COLORS.white} />
-              </TouchableOpacity>
             </Animated.View>
 
             <Text style={styles.userName}>Hariprasath G</Text>
@@ -170,7 +167,6 @@ const ProfileScreen = () => {
           <View style={styles.menuContainer}>
             <Text style={styles.menuSectionTitle}>Account Settings</Text>
             {[
-              { icon: 'account-edit-outline', label: 'Edit Profile', color: '#5C6BC0' },
               { icon: 'car-outline', label: 'Vehicle Documents', color: '#66BB6A' },
               { icon: 'card-account-details-outline', label: 'Subscription Details', color: '#FFA726' },
               { icon: 'bell-outline', label: 'Notifications', color: '#26C6DA' },
@@ -237,19 +233,6 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: COLORS.white,
     ...SHADOW.medium,
-  },
-  editBtn: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    backgroundColor: COLORS.primary,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
   },
   userName: {
     fontSize: 24,

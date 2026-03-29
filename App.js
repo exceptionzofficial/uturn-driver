@@ -10,6 +10,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SplashScreen from './src/screens/auth/SplashScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
+import OtpScreen from './src/screens/auth/OtpScreen';
 import ActingDriverRegisterScreen from './src/screens/auth/ActingDriverRegisterScreen';
 import HomeScreen from './src/screens/main/HomeScreen';
 import MyTaskScreen from './src/screens/main/MyTaskScreen';
@@ -201,6 +202,11 @@ const App = () => {
               name="Login"
               component={LoginScreen}
               options={{ animation: 'slide_from_right', animationDuration: 400 }}
+            />
+            <Stack.Screen
+              name="Otp"
+              component={OtpScreen}
+              options={{ animation: 'slide_from_right' }}
             />
             <Stack.Screen
               name="MainTabs"

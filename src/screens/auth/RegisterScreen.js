@@ -15,12 +15,15 @@ import {
   Modal,
   FlatList,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { Calendar } from 'react-native-calendars';
+import ImagePicker from 'react-native-image-crop-picker';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import Loader from '../../components/Loader';
+import apiClient from '../../api/apiClient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -58,6 +61,11 @@ const RegisterScreen = ({ navigation, route }) => {
   const [tempDay, setTempDay] = useState('01');
   const [tempMonth, setTempMonth] = useState(MONTHS[new Date().getMonth()]);
   const [tempYear, setTempYear] = useState(CURRENT_YEAR.toString());
+  const [aadharError, setAadharError] = useState('');
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [aadhaarFront, setAadhaarFront] = useState(null);
+  const [dlFront, setDlFront] = useState(null);
+  const [dlBack, setDlBack] = useState(null);
 
   // Step 1: Personal Data
   const [personalData, setPersonalData] = useState({
@@ -94,8 +102,12 @@ const RegisterScreen = ({ navigation, route }) => {
 
   const handleNext = () => {
     if (step === 1) {
-      if (!personalData.name || !personalData.state || !personalData.dob || !personalData.licenceExpiry || !personalData.aadhar) {
-        Alert.alert('Incomplete Form', 'Please fill in all mandatory fields.');
+      if (!personalData.name || !personalData.state || !personalData.dob || !personalData.licenceExpiry || !personalData.aadhar || !profilePhoto || !aadhaarFront || !dlFront || !dlBack) {
+        Alert.alert('Incomplete Form', 'Please fill in all mandatory fields and capture all required documents (Selfie, Aadhaar Front, DL Front & Back).');
+        return;
+      }
+      if (aadharError) {
+        Alert.alert('Existing Account', aadharError);
         return;
       }
       if (isDateExpired(personalData.licenceExpiry)) {
@@ -104,6 +116,56 @@ const RegisterScreen = ({ navigation, route }) => {
       }
       animateTransition(() => setStep(2));
     }
+  };
+
+  const checkAadhar = async (val) => {
+    if (val.length === 12) {
+      try {
+        const response = await apiClient.post('/driver/check-aadhar', { aadhar: val });
+        if (response.data.exists) {
+          setAadharError('Aadhaar already exists. Please login.');
+        } else {
+          setAadharError('');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setAadharError('');
+    }
+  };
+
+  const takeSelfie = () => {
+    ImagePicker.openCamera({
+      width: 400,
+      height: 400,
+      cropping: true,
+      useFrontCamera: true,
+      includeBase64: false,
+    }).then(image => {
+      setProfilePhoto(image);
+    }).catch(err => {
+      if (err.message !== 'User cancelled image selection') {
+        Alert.alert('Camera Error', 'Could not open camera.');
+      }
+    });
+  };
+
+  const captureDocument = (type) => {
+    ImagePicker.openCamera({
+      width: 800,
+      height: 500,
+      cropping: true,
+      includeBase64: false,
+    }).then(image => {
+      if (type === 'aadhaarFront') setAadhaarFront(image);
+      else if (type === 'dlFront') setDlFront(image);
+      else if (type === 'dlBack') setDlBack(image);
+    }).catch(err => {
+      if (err.message !== 'User cancelled image selection') {
+        Alert.alert('Camera Error', 'Could not open camera.');
+      }
+    });
   };
 
   const handleBack = () => {
@@ -125,18 +187,56 @@ const RegisterScreen = ({ navigation, route }) => {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!vehicleData.number || !vehicleData.insuranceExpiry) {
       Alert.alert('Required', 'Please fill in mandatory vehicle and expiry details.');
       return;
     }
     setLoading(true);
-    setTimeout(() => {
+    
+    try {
+      const formData = new FormData();
+      
+      // Helper to append file
+      const appendFile = (field, file, name) => {
+        if (file) {
+          formData.append(field, {
+            uri: Platform.OS === 'android' ? file.path : file.path.replace('file://', ''),
+            type: file.mime,
+            name: `${name}_${personalData.phone}.jpg`,
+          });
+        }
+      };
+
+      appendFile('profilePhoto', profilePhoto, 'profile');
+      appendFile('aadhaarFront', aadhaarFront, 'aadhaar_front');
+      appendFile('dlFront', dlFront, 'dl_front');
+      appendFile('dlBack', dlBack, 'dl_back');
+      
+      const payload = {
+        ...personalData,
+        ...vehicleData
+      };
+      
+      formData.append('driverData', JSON.stringify(payload));
+
+      const response = await apiClient.post('/driver/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       setLoading(false);
-      Alert.alert('Registration Successful', 'Welcome to U-Turn! Your documents are being verified.', [
-        { text: 'Start Earning', onPress: () => navigation.replace('MainTabs')}
-      ]);
-    }, 2000);
+      if (response.data.success) {
+        Alert.alert('Application Submitted', 'Welcome to U-Turn! Your documents are being verified. Your login will be active once approved.', [
+          { text: 'Got it', onPress: () => navigation.replace('Login')}
+        ]);
+      }
+    } catch (err) {
+      setLoading(false);
+      Alert.alert('Registration Failed', 'Something went wrong. Please try again.');
+      console.error(err);
+    }
   };
 
   const onDateSelect = (day) => {
@@ -230,15 +330,19 @@ const RegisterScreen = ({ navigation, route }) => {
 
               {/* Profile Photo Upload */}
               <View style={styles.profileUploadContainer}>
-                <TouchableOpacity style={styles.profileUploadBox}>
+                <TouchableOpacity style={styles.profileUploadBox} onPress={takeSelfie}>
                   <View style={styles.avatarPlaceholder}>
-                    <Icon name="account" size={50} color="#DDD" />
+                    {profilePhoto ? (
+                      <Image source={{ uri: profilePhoto.path }} style={styles.selfieImage} />
+                    ) : (
+                      <Icon name="account" size={50} color="#DDD" />
+                    )}
                   </View>
                   <View style={styles.cameraIconBadge}>
                     <Icon name="camera" size={16} color={COLORS.white} />
                   </View>
                 </TouchableOpacity>
-                <Text style={styles.profilePhotoLabel}>Profile Photo *</Text>
+                <Text style={styles.profilePhotoLabel}>Real Selfie Only *</Text>
               </View>
 
               {renderInputField('Full Name *', 'account-outline', personalData.name, (t) => setPersonalData({...personalData, name: t}), 'Enter as per Aadhaar')}
@@ -256,24 +360,66 @@ const RegisterScreen = ({ navigation, route }) => {
               
               <Text style={styles.sectionHeading}>KYC Documents</Text>
 
-              {renderInputField('Aadhaar Number *', 'card-account-details-outline', personalData.aadhar, (t) => setPersonalData({...personalData, aadhar: t}), '12-digit number', 'number-pad')}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Aadhaar Card Upload *</Text>
-                <TouchableOpacity style={styles.fullUploadCard}>
-                  <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
-                  <Text style={styles.uploadTextLarge}>Upload Aadhaar (Front & Back)</Text>
-                  <Text style={styles.uploadSubText}>Ensure all details are clearly visible</Text>
+                <Text style={styles.label}>Aadhaar Number *</Text>
+                <View style={[styles.inputWrapper, aadharError && styles.errorInput]}>
+                  <Icon name="card-account-details-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={personalData.aadhar}
+                    onChangeText={(t) => {
+                      setPersonalData({...personalData, aadhar: t});
+                      checkAadhar(t);
+                    }}
+                    placeholder="12-digit number"
+                    keyboardType="number-pad"
+                    maxLength={12}
+                  />
+                  {aadharError && <Icon name="alert-circle" size={18} color={COLORS.error} />}
+                </View>
+                {aadharError ? <Text style={styles.errorText}>{aadharError}</Text> : null}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Aadhaar Card Front *</Text>
+                <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('aadhaarFront')}>
+                  {aadhaarFront ? (
+                    <Image source={{ uri: aadhaarFront.path }} style={styles.docPreview} resizeMode="cover" />
+                  ) : (
+                    <>
+                      <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Capture Aadhaar Front</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
               {renderInputField('Driving Licence No.*', 'badge-account-outline', personalData.licenceNumber, (t) => setPersonalData({...personalData, licenceNumber: t}), 'Enter DL Number')}
               
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Driving Licence Upload *</Text>
-                <TouchableOpacity style={styles.fullUploadCard}>
-                  <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
-                  <Text style={styles.uploadTextLarge}>Upload Licence (Front & Back)</Text>
-                  <Text style={styles.uploadSubText}>Capture both sides for verification</Text>
+                <Text style={styles.label}>Driving Licence Front *</Text>
+                <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('dlFront')}>
+                  {dlFront ? (
+                    <Image source={{ uri: dlFront.path }} style={styles.docPreview} resizeMode="cover" />
+                  ) : (
+                    <>
+                      <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Capture DL Front</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Driving Licence Back *</Text>
+                <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('dlBack')}>
+                  {dlBack ? (
+                    <Image source={{ uri: dlBack.path }} style={styles.docPreview} resizeMode="cover" />
+                  ) : (
+                    <>
+                      <Icon name="camera-plus-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Capture DL Back</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -781,6 +927,26 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     marginTop: 8,
     opacity: 0.7,
+  },
+  selfieImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  docPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: RADIUS.md,
+  },
+  errorInput: {
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 5,
+    marginLeft: 5,
   },
   sectionHeading: {
     fontSize: 18,

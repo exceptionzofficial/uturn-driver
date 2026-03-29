@@ -15,22 +15,68 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { Alert } from 'react-native';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import Loader from '../../components/Loader';
+import apiClient from '../../api/apiClient';
+import OtpVerify from 'react-native-otp-verify';
+import { useEffect } from 'react';
 
 const LoginScreen = ({ navigation }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRegModal, setShowRegModal] = useState(false);
   const [regType, setRegType] = useState('driver'); // 'driver' or 'acting'
+  const [appHash, setAppHash] = useState('');
 
-  const handleLogin = () => {
+  useEffect(() => {
+    // Get the App Hash for SMS Retriever API
+    OtpVerify.getHash()
+      .then(hash => {
+        setAppHash(hash[0]); // hash is an array
+      })
+      .catch(err => console.log('Hash Error:', err));
+  }, []);
+
+  const handleLogin = async () => {
+    if (phone.length !== 10) {
+      Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await apiClient.post('/driver/check-status', { phone });
+      const { exists, status } = response.data;
+
+      if (exists && status === 'PENDING_REVIEW') {
+        setLoading(false);
+        Alert.alert('Application Under Review', 'Your application is currently being verified by our team. Please check back later.');
+        return;
+      }
+
+      // If NOT_FOUND or APPROVED, proceed to OTP
+      // For existing active-approved users, they just login.
+      // For new users, they start registration.
+      
+      const otpResponse = await apiClient.post('/driver/send-otp', { 
+        phone, 
+        appHash: appHash 
+      });
       setLoading(false);
-      navigation.replace('MainTabs');
-    }, 2000);
+      
+      if (otpResponse.data.success) {
+        navigation.navigate('Otp', { 
+          phone, 
+          isNewUser: !exists, 
+          regType: regType 
+        });
+      }
+    } catch (err) {
+      setLoading(false);
+      Alert.alert('Connection Error', 'Unable to reach the server. Please try again.');
+      console.error(err);
+    }
   };
 
   const handleRegisterPress = (type) => {
@@ -39,16 +85,8 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const proceedToRegistration = () => {
-    if (phone.length !== 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
-      return;
-    }
     setShowRegModal(false);
-    if (regType === 'driver') {
-      navigation.navigate('Register', { verifiedPhone: phone });
-    } else {
-      navigation.navigate('ActingDriverRegister', { verifiedPhone: phone });
-    }
+    handleLogin(); // Now uses the status-aware & OTP-enabled flow
   };
 
   return (

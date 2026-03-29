@@ -66,6 +66,10 @@ const RegisterScreen = ({ navigation, route }) => {
   const [aadhaarFront, setAadhaarFront] = useState(null);
   const [dlFront, setDlFront] = useState(null);
   const [dlBack, setDlBack] = useState(null);
+  const [rcFront, setRcFront] = useState(null);
+  const [insuranceFront, setInsuranceFront] = useState(null);
+  const [fcFront, setFcFront] = useState(null);
+  const [permitFront, setPermitFront] = useState(null);
 
   // Step 1: Personal Data
   const [personalData, setPersonalData] = useState({
@@ -161,6 +165,10 @@ const RegisterScreen = ({ navigation, route }) => {
       if (type === 'aadhaarFront') setAadhaarFront(image);
       else if (type === 'dlFront') setDlFront(image);
       else if (type === 'dlBack') setDlBack(image);
+      else if (type === 'rcFront') setRcFront(image);
+      else if (type === 'insuranceFront') setInsuranceFront(image);
+      else if (type === 'fcFront') setFcFront(image);
+      else if (type === 'permitFront') setPermitFront(image);
     }).catch(err => {
       if (err.message !== 'User cancelled image selection') {
         Alert.alert('Camera Error', 'Could not open camera.');
@@ -188,8 +196,8 @@ const RegisterScreen = ({ navigation, route }) => {
   };
 
   const handleSubmit = async () => {
-    if (!vehicleData.number || !vehicleData.insuranceExpiry) {
-      Alert.alert('Required', 'Please fill in mandatory vehicle and expiry details.');
+    if (!vehicleData.number || !vehicleData.insuranceExpiry || !rcFront || !insuranceFront || !fcFront) {
+      Alert.alert('Required', 'Please fill in mandatory vehicle and capture Required Documents (RC, Insurance & FC).');
       return;
     }
     setLoading(true);
@@ -212,10 +220,15 @@ const RegisterScreen = ({ navigation, route }) => {
       appendFile('aadhaarFront', aadhaarFront, 'aadhaar_front');
       appendFile('dlFront', dlFront, 'dl_front');
       appendFile('dlBack', dlBack, 'dl_back');
+      appendFile('rcFront', rcFront, 'rc_front');
+      appendFile('insuranceFront', insuranceFront, 'insurance_front');
+      appendFile('fcFront', fcFront, 'fc_front');
+      appendFile('permitFront', permitFront, 'permit_front');
       
       const payload = {
         ...personalData,
-        ...vehicleData
+        ...vehicleData,
+        vehicleNumber: vehicleData.number // Map for backend
       };
       
       formData.append('driverData', JSON.stringify(payload));
@@ -438,6 +451,8 @@ const RegisterScreen = ({ navigation, route }) => {
 
               {renderInputField('Vehicle Registration No.*', 'car-cog', vehicleData.number, (t) => setVehicleData({...vehicleData, number: t}), 'e.g. TN 37 AB 1234')}
               
+
+
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Trip Type *</Text>
                 <View style={styles.chipRow}>
@@ -475,20 +490,32 @@ const RegisterScreen = ({ navigation, route }) => {
                {/* RC SECTION */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>RC Details *</Text>
-                <TouchableOpacity style={styles.fullUploadCard}>
-                  <Icon name="file-document-outline" size={32} color={COLORS.primary} />
-                  <Text style={styles.uploadTextLarge}>Upload RC Document</Text>
-                  <Text style={styles.uploadSubText}>Clear photo of Registration Certificate</Text>
+                <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('rcFront')}>
+                  {rcFront ? (
+                    <Image source={{ uri: rcFront.path }} style={styles.docPreview} resizeMode="cover" />
+                  ) : (
+                    <>
+                      <Icon name="file-document-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Upload RC Document</Text>
+                      <Text style={styles.uploadSubText}>Clear photo of Registration Certificate</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
               {/* INSURANCE SECTION */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Insurance Policy *</Text>
-                <TouchableOpacity style={styles.fullUploadCard}>
-                  <Icon name="shield-check-outline" size={32} color={COLORS.primary} />
-                  <Text style={styles.uploadTextLarge}>Upload Insurance Photocopy</Text>
-                  <Text style={styles.uploadSubText}>Valid insurance policy document</Text>
+                <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('insuranceFront')}>
+                  {insuranceFront ? (
+                    <Image source={{ uri: insuranceFront.path }} style={styles.docPreview} resizeMode="cover" />
+                  ) : (
+                    <>
+                      <Icon name="shield-check-outline" size={32} color={COLORS.primary} />
+                      <Text style={styles.uploadTextLarge}>Upload Insurance Photocopy</Text>
+                      <Text style={styles.uploadSubText}>Valid insurance policy document</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
               {renderSelectorField('Insurance Expiry *', 'calendar-star-outline', vehicleData.insuranceExpiry, () => {
@@ -501,11 +528,17 @@ const RegisterScreen = ({ navigation, route }) => {
               {vehicleData.vehicleType !== 'Bike' && (
                 <>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Fitness Certificate (FC)</Text>
-                    <TouchableOpacity style={styles.fullUploadCard}>
-                      <Icon name="certificate-outline" size={32} color={COLORS.primary} />
-                      <Text style={styles.uploadTextLarge}>Upload FC Document</Text>
-                      <Text style={styles.uploadSubText}>Current vehicle fitness certificate</Text>
+                    <Text style={styles.label}>Fitness Certificate (FC) *</Text>
+                    <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('fcFront')}>
+                      {fcFront ? (
+                        <Image source={{ uri: fcFront.path }} style={styles.docPreview} resizeMode="cover" />
+                      ) : (
+                        <>
+                          <Icon name="certificate-outline" size={32} color={COLORS.primary} />
+                          <Text style={styles.uploadTextLarge}>Upload FC Document</Text>
+                          <Text style={styles.uploadSubText}>Current vehicle fitness certificate</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                   {renderSelectorField('FC Expiry Date', 'calendar-check-outline', vehicleData.fcExpiry, () => {
@@ -520,11 +553,17 @@ const RegisterScreen = ({ navigation, route }) => {
               {vehicleData.tripType === 'Passenger' && !['Bike', 'Auto'].includes(vehicleData.vehicleType) && (
                 <>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Vehicle Permit *</Text>
-                    <TouchableOpacity style={styles.fullUploadCard}>
-                      <Icon name="newspaper-variant-outline" size={32} color={COLORS.primary} />
-                      <Text style={styles.uploadTextLarge}>Upload Permit Document</Text>
-                      <Text style={styles.uploadSubText}>Valid state or national permit</Text>
+                    <Text style={styles.label}>Vehicle Permit</Text>
+                    <TouchableOpacity style={styles.fullUploadCard} onPress={() => captureDocument('permitFront')}>
+                      {permitFront ? (
+                        <Image source={{ uri: permitFront.path }} style={styles.docPreview} resizeMode="cover" />
+                      ) : (
+                        <>
+                          <Icon name="newspaper-variant-outline" size={32} color={COLORS.primary} />
+                          <Text style={styles.uploadTextLarge}>Upload Permit Document</Text>
+                          <Text style={styles.uploadSubText}>Valid state or national permit</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                   {renderSelectorField('Permit Expiry Date', 'calendar-clock', vehicleData.permitExpiry, () => {

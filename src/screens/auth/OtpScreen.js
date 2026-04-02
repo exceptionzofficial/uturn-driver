@@ -13,9 +13,12 @@ import OtpVerify from 'react-native-otp-verify';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import apiClient from '../../api/apiClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppContext } from '../../context/AppContext';
 
 const OtpScreen = ({ navigation, route }) => {
   const { phone, isNewUser, regType } = route.params;
+  const { setUserData } = useAppContext();
   const [status, setStatus] = useState('Waiting for OTP...');
   const [loading, setLoading] = useState(false);
 
@@ -48,9 +51,20 @@ const OtpScreen = ({ navigation, route }) => {
     try {
       const response = await apiClient.post('/driver/verify-otp', { phone, otp });
       if (response.data.success) {
+        // Save session
+        await AsyncStorage.setItem('user_session', JSON.stringify({ phone, regType }));
+        await AsyncStorage.setItem('is_logged_in', 'true');
+
         if (isNewUser) {
           navigation.replace('Register', { verifiedPhone: phone, regType });
         } else {
+          // Fetch profile for existing user
+          try {
+            const profileRes = await apiClient.get(`/driver/profile/${phone}`);
+            setUserData(profileRes.data);
+          } catch (e) {
+            console.log('Profile fetch failed during login:', e);
+          }
           navigation.replace('MainTabs');
         }
       } else {

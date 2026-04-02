@@ -51,7 +51,7 @@ const BANNERS = [
 const BANNER_WIDTH = width - SPACING.lg * 2;
 
 const HomeScreen = () => {
-  const { isOnline, setIsOnline } = useAppContext();
+  const { isOnline, setIsOnline, userData } = useAppContext();
   const [locationName, setLocationName] = useState('Locating...');
   const [loading, setLoading] = useState(true);
   const [region, setRegion] = useState({
@@ -382,8 +382,8 @@ const HomeScreen = () => {
                     </View>
                   ) : (
                     <View>
-                      <Text style={styles.brandText}>MY VEHICLE</Text>
-                      <Text style={styles.tagline}>Maruthi Suzuki Swift</Text>
+                      <Text style={styles.brandText}>{userData?.vehicleType?.toUpperCase() || 'MY VEHICLE'}</Text>
+                      <Text style={styles.tagline}>{userData?.vehicleNumber || 'Wait for approval'}</Text>
                     </View>
                   )}
                 </Animated.View>
@@ -454,9 +454,12 @@ const HomeScreen = () => {
                 </Animated.View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.profileCircle}>
+              <TouchableOpacity 
+                style={styles.profileCircle}
+                onPress={() => navigation.navigate('Profile')}
+              >
                 <Image
-                  source={{ uri: 'https://i.pravatar.cc/250?img=67' }}
+                  source={{ uri: userData?.profilePhoto || 'https://via.placeholder.com/150' }}
                   style={styles.profileImage}
                 />
               </TouchableOpacity>

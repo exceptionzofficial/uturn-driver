@@ -9,10 +9,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, RADIUS, SHADOW, SPACING } from '../../theme/AppTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppContext } from '../../context/AppContext';
+import apiClient from '../../api/apiClient';
 
 const { height, width } = Dimensions.get('window');
 
 const SplashScreen = ({ navigation }) => {
+  const { setUserData } = useAppContext();
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -64,8 +68,24 @@ const SplashScreen = ({ navigation }) => {
           duration: 800,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        navigation.replace('Login');
+      ]).start(async () => {
+        try {
+          const isLoggedIn = await AsyncStorage.getItem('is_logged_in');
+          const session = await AsyncStorage.getItem('user_session');
+          
+          if (isLoggedIn === 'true' && session) {
+            const { phone } = JSON.parse(session);
+            // Fetch profile
+            const response = await apiClient.get(`/driver/profile/${phone}`);
+            setUserData(response.data);
+            navigation.replace('MainTabs');
+          } else {
+            navigation.replace('Login');
+          }
+        } catch (e) {
+          console.log('Splash Session Error:', e);
+          navigation.replace('Login');
+        }
       });
     }, 3000);
 

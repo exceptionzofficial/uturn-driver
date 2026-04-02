@@ -13,16 +13,20 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
+import { useAppContext } from '../../context/AppContext';
 
 const { width } = Dimensions.get('window');
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // Animation Refs
   const avatarAnim = useRef(new Animated.Value(0)).current;
   const statsTitleAnim = useRef(new Animated.Value(0)).current;
   const statsAnims = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  const { userData } = useAppContext();
   const [lowRideEnabled, setLowRideEnabled] = useState(false);
 
   useEffect(() => {
@@ -79,13 +83,13 @@ const ProfileScreen = () => {
               ]
             }]}>
               <Image
-                source={{ uri: 'https://i.pravatar.cc/250?img=67' }}
+                source={{ uri: userData?.profilePhoto || 'https://via.placeholder.com/150' }}
                 style={styles.avatar}
               />
             </Animated.View>
 
-            <Text style={styles.userName}>Hariprasath G</Text>
-            <Text style={styles.userRole}>Premium Driver</Text>
+            <Text style={styles.userName}>{userData?.name || 'Driver Name'}</Text>
+            <Text style={styles.userRole}>{userData?.vehicleNumber || 'Premium Driver'}</Text>
 
             <View style={styles.badgeRow}>
               <View style={[styles.badge, { backgroundColor: '#FFF9C4' }]}>
@@ -174,7 +178,21 @@ const ProfileScreen = () => {
               { icon: 'help-circle-outline', label: 'Support & Help', color: '#AB47BC' },
               { icon: 'logout', label: 'Logout', color: COLORS.accentRed },
             ].map((item, index) => (
-              <TouchableOpacity key={index} style={styles.menuItem}>
+              <TouchableOpacity 
+                key={index} 
+                style={styles.menuItem}
+                onPress={async () => {
+                  if (item.label === 'Logout') {
+                    await AsyncStorage.multiRemove(['user_session', 'is_logged_in']);
+                    navigation.dispatch(
+                      CommonActions.reset({
+                        index: 0,
+                        routes: [{ name: 'Login' }],
+                      })
+                    );
+                  }
+                }}
+              >
                 <View style={[styles.menuIconContainer, { backgroundColor: item.color + '15' }]}>
                   <Icon name={item.icon} size={22} color={item.color} />
                 </View>

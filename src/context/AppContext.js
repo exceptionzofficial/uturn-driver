@@ -4,9 +4,10 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [isOnline, setIsOnline] = useState(false);
+  const [userData, setUserData] = useState(null);
 
   return (
-    <AppContext.Provider value={{ isOnline, setIsOnline }}>
+    <AppContext.Provider value={{ isOnline, setIsOnline, userData, setUserData }}>
       {children}
     </AppContext.Provider>
   );

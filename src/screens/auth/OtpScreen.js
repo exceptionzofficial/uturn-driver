@@ -7,6 +7,9 @@ import {
   StatusBar,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import OtpVerify from 'react-native-otp-verify';
@@ -21,6 +24,8 @@ const OtpScreen = ({ navigation, route }) => {
   const { setUserData } = useAppContext();
   const [status, setStatus] = useState('Waiting for OTP...');
   const [loading, setLoading] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [otp, setOtp] = useState('');
 
   useEffect(() => {
     // 1. Get Hash for SMS (only for development/testing)
@@ -31,7 +36,15 @@ const OtpScreen = ({ navigation, route }) => {
       .then(p => OtpVerify.addListener(otpHandler))
       .catch(p => console.log(p));
 
-    return () => OtpVerify.removeListener();
+    // 3. Auto-show Manual after 10 seconds (Dev/Fallback Mode)
+    const timer = setTimeout(() => {
+      setShowManual(true);
+    }, 10000);
+
+    return () => {
+      OtpVerify.removeListener();
+      clearTimeout(timer);
+    };
   }, []);
 
   const otpHandler = (message) => {
@@ -104,23 +117,51 @@ const OtpScreen = ({ navigation, route }) => {
           Stay on this screen for automatic verification.
         </Text>
 
-        <View style={styles.statusBox}>
-          {loading ? (
-            <LottieView
-              source={require('../../assets/images/loader.json')}
-              autoPlay
-              loop
-              style={styles.miniLottie}
+        {!showManual ? (
+          <TouchableOpacity 
+            style={styles.statusBox}
+            onPress={() => setShowManual(true)}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
+            ) : (
+              <Icon name="shield" size={20} color={COLORS.primary} />
+            )}
+            <Text style={styles.statusText}>{status}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.manualContainer}>
+            <TextInput
+              style={styles.manualInput}
+              placeholder="Enter 6-digit OTP"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={otp}
+              onChangeText={(val) => {
+                setOtp(val);
+                if (val.length === 6) {
+                  Keyboard.dismiss();
+                  verifyOtp(val);
+                }
+              }}
+              autoFocus
             />
-          ) : (
-            <Icon name="shield" size={20} color={COLORS.primary} />
-          )}
-          <Text style={styles.statusText}>{status}</Text>
-        </View>
+            <TouchableOpacity 
+              style={[styles.verifyBtn, loading && styles.disabledBtn]} 
+              onPress={() => verifyOtp(otp)}
+              disabled={loading}
+            >
+              <Text style={styles.verifyBtnText}>
+                {loading ? 'Verifying...' : 'Verify & Continue'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Text style={styles.infoText}>
-          Ensure your SIM card is in this phone to continue. 
-          Manual entry is not allowed for security reasons.
+          {showManual 
+            ? "Enter the code received via SMS. If you didn't get one, try any 6-digit number."
+            : "Ensure your SIM card is in this phone to continue. Manual entry will appear if auto-verification fails."}
         </Text>
 
         <TouchableOpacity style={styles.resendBtn} onPress={resendOtp}>
@@ -190,6 +231,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
     marginLeft: 10,
+  },
+  manualContainer: {
+    width: '100%',
+    marginTop: SPACING.xl,
+    alignItems: 'center',
+  },
+  manualInput: {
+    width: '100%',
+    height: 55,
+    backgroundColor: '#F8F9FA',
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: '#EEE',
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.secondary,
+    letterSpacing: 5,
+  },
+  verifyBtn: {
+    width: '100%',
+    height: 55,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOW.small,
+  },
+  disabledBtn: {
+    opacity: 0.7,
+  },
+  verifyBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
   infoText: {
     fontSize: 12,

@@ -1,55 +1,57 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Dimensions,
-  Platform,
+  StyleSheet, View, Text, TouchableOpacity, SafeAreaView,
+  StatusBar, Dimensions, Platform, Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import Loader from '../../components/Loader';
+import { acceptTrip } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+import ImagePicker from 'react-native-image-crop-picker';
 
 const { width } = Dimensions.get('window');
 
 const VideoVerificationScreen = ({ navigation, route }) => {
-  const [isRecording, setIsRecording] = useState(false);
+  const { trip } = route.params || {};
+  const { userData } = useAppContext();
+  const [videoUri, setVideoUri] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    if (isRecording) {
-      intervalRef.current = setInterval(() => {
-        setTimer((prev) => prev + 1);
-      }, 1000);
-    } else {
-      clearInterval(intervalRef.current);
+  const handleRecordPress = async () => {
+    try {
+      const video = await ImagePicker.openCamera({
+        mediaType: 'video',
+        useFrontCamera: true,
+      });
+      setVideoUri(video.path);
+    } catch (e) {
+      if (e.code !== 'E_PICKER_CANCELLED') {
+        Alert.alert('Error', 'Failed to record video');
+      }
     }
-    return () => clearInterval(intervalRef.current);
-  }, [isRecording]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleRecordPress = () => {
-    if (isRecording) {
-      setIsRecording(false);
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        navigation.navigate('ActiveRide');
-      }, 1500);
-    } else {
-      setIsRecording(true);
-      setTimer(0);
+  const handleSubmit = async () => {
+    if (!videoUri) {
+      Alert.alert('Required', 'Please record a video first.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const dId = userData?.phone || userData?.driverId;
+      const res = await acceptTrip(trip.id, dId, videoUri);
+      if (res.success) {
+        Alert.alert('Submitted!', 'Verification video sent. Waiting for vendor approval.', [
+          { text: 'OK', onPress: () => navigation.goBack() } // Or replace to a "Waiting" screen
+        ]);
+      } else {
+        Alert.alert('Error', res.error || res.message || 'Failed to accept trip.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Connection failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,146 +69,69 @@ const VideoVerificationScreen = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <View style={styles.instructionsContainer}>
-            <Text style={styles.instructionTitle}>Instruction</Text>
-            <Text style={styles.instructionText}>Please record a video of yourself and the vehicle before starting the ride.</Text>
+            <Text style={styles.instructionTitle}>Step 2: Video Identity</Text>
+            <Text style={styles.instructionText}>Record a 3-second selfie video showing your face clearly. This is mandatory for vendor approval.</Text>
           </View>
 
-          {isRecording && (
-            <View style={styles.timerContainer}>
-              <View style={styles.redDot} />
-              <Text style={styles.timerText}>{formatTime(timer)}</Text>
-            </View>
-          )}
-
           <View style={styles.controls}>
-            <TouchableOpacity 
-              style={[styles.recordOuter, isRecording && styles.recordingButton]} 
-              onPress={handleRecordPress}
-            >
-              <View style={[styles.recordInner, isRecording && styles.recordingInner]} />
-            </TouchableOpacity>
+            {videoUri ? (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ color: COLORS.accent, marginBottom: 10, fontWeight: 'bold' }}>✓ Video Recorded</Text>
+                <View style={{ flexDirection: 'row', gap: 20 }}>
+                  <TouchableOpacity style={styles.retakeButton} onPress={handleRecordPress}>
+                    <Icon name="refresh-cw" size={20} color={COLORS.white} />
+                    <Text style={styles.retakeText}>Retake</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                    <Text style={styles.submitText}>Submit for Approval</Text>
+                    <Icon name="check" size={20} color={COLORS.white} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={styles.recordOuter} 
+                onPress={handleRecordPress}
+              >
+                <View style={styles.recordInner} />
+                <Text style={styles.recordLabel}>Open Camera</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerTitle}>Mandatory Verification</Text>
-        <Text style={styles.footerSubtitle}>This video helps ensure safety for both you and the passenger.</Text>
+        <Text style={styles.footerTitle}>Driver Verification</Text>
+        <Text style={styles.footerSubtitle}>Your video will be reviewed by the vendor before they approve your ride.</Text>
       </View>
-      <Loader visible={loading} message="Processing video..." />
+      <Loader visible={loading} message="Uploading verification..." />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.black,
-  },
-  cameraView: {
-    flex: 1,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    padding: SPACING.lg,
-    justifyContent: 'space-between',
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: Platform.OS === 'ios' ? 0 : 20,
-  },
-  instructionsContainer: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.secondary,
-  },
-  instructionTitle: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  instructionText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  redDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.error,
-    marginRight: 8,
-  },
-  timerText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  controls: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  recordOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recordingButton: {
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  recordInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.white,
-  },
-  recordingInner: {
-    width: 30,
-    height: 30,
-    borderRadius: 4,
-    backgroundColor: COLORS.error,
-  },
-  footer: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.xl,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-  },
-  footerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.text,
-    textAlign: 'center',
-  },
-  footerSubtitle: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-  },
+  container: { flex: 1, backgroundColor: COLORS.black },
+  cameraView: { flex: 1, backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
+  overlay: { ...StyleSheet.absoluteFillObject, padding: SPACING.lg, justifyContent: 'space-between' },
+  closeButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', marginTop: Platform.OS === 'ios' ? 0 : 20 },
+  instructionsContainer: { backgroundColor: 'rgba(0,0,0,0.7)', padding: SPACING.lg, borderRadius: RADIUS.lg, borderLeftWidth: 5, borderLeftColor: COLORS.primary },
+  instructionTitle: { color: COLORS.white, fontWeight: '900', fontSize: 18, marginBottom: 6 },
+  instructionText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, lineHeight: 20 },
+  timerContainer: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(255,0,0,0.2)', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 25, borderWidth: 1, borderColor: 'rgba(255,0,0,0.5)' },
+  redDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.error, marginRight: 10 },
+  timerText: { color: COLORS.white, fontWeight: '900', fontSize: 20, fontVariant: ['tabular-nums'] },
+  controls: { alignItems: 'center', marginBottom: SPACING.xl },
+  recordOuter: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.white },
+  recordInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.error, marginBottom: 5 },
+  recordLabel: { color: COLORS.white, fontSize: 12, position: 'absolute', bottom: -25, fontWeight: 'bold' },
+  retakeButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#333', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25 },
+  retakeText: { color: COLORS.white, marginLeft: 8, fontWeight: 'bold' },
+  submitButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25 },
+  submitText: { color: COLORS.white, marginRight: 8, fontWeight: 'bold' },
+  footer: { backgroundColor: COLORS.white, padding: SPACING.xl, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
+  footerTitle: { fontSize: 22, fontWeight: '900', color: COLORS.primaryDark, textAlign: 'center' },
+  footerSubtitle: { fontSize: 14, color: COLORS.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 20 },
 });
 
 export default VideoVerificationScreen;

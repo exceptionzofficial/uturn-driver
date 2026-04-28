@@ -3,7 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Dimensions,
@@ -12,24 +11,22 @@ import {
   Platform,
   Animated,
   Modal,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Calendar } from 'react-native-calendars';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
 import { useAppContext } from '../../context/AppContext';
+import { getDriverTrips } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
-const HISTORY_DATA = [
-  { id: '1', date: 'Today', fullDate: '2026-03-15', time: '11:20 AM', amount: '₹320.00', from: 'Town Hall', to: 'Railway Station', distance: '8.4 km', timeTaken: '24 mins' },
-  { id: '2', date: 'Yesterday', fullDate: '2026-03-14', time: '06:45 PM', amount: '₹185.50', from: 'Bus Stand', to: 'Hotel Residency', distance: '4.2 km', timeTaken: '12 mins' },
-  { id: '3', date: '23 Oct', fullDate: '2026-10-23', time: '02:15 PM', amount: '₹540.00', from: 'Airport', to: 'Saibaba Colony', distance: '12.8 km', timeTaken: '45 mins' },
-  { id: '4', date: '22 Oct', fullDate: '2026-10-22', time: '10:30 AM', amount: '₹210.00', from: 'Gandhipuram', to: 'Singanallur', distance: '5.6 km', timeTaken: '18 mins' },
-];
+// Dummy data removed. Real data fetched from backend.
 
 const HistoryScreen = () => {
-  const { isOnline, setIsOnline } = useAppContext();
+  const { isOnline, setIsOnline, userData } = useAppContext();
 
   // Animations
   const headerCycleAnim = useRef(new Animated.Value(0)).current;
@@ -37,6 +34,8 @@ const HistoryScreen = () => {
   const [showHeaderInfo, setShowHeaderInfo] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const cycleInterval = setInterval(() => {
@@ -64,7 +63,25 @@ const HistoryScreen = () => {
       tension: 50,
       useNativeDriver: true,
     }).start();
+
+    fetchHistory();
   }, [isOnline]);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    try {
+      const dId = userData?.phone || userData?.driverId;
+      if (dId) {
+        // Fetch completed trips as history
+        const data = await getDriverTrips(dId, 'completed');
+        setHistory(data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onDateSelect = (day) => {
     setSelectedDate(day.dateString);
@@ -72,8 +89,12 @@ const HistoryScreen = () => {
   };
 
   const filteredHistory = selectedDate 
-    ? HISTORY_DATA.filter(item => item.fullDate === selectedDate)
-    : HISTORY_DATA;
+    ? history.filter(item => item.scheduleDate === selectedDate)
+    : history;
+
+  const totalEarnings = history.reduce((sum, item) => sum + Number(item.driverPayout || item.totalFare || item.totalTripAmount || 0), 0);
+  const totalTrips = history.length;
+  const totalDistance = history.reduce((sum, item) => sum + (parseFloat(item.distance) || parseFloat(item.distanceKm) || 0), 0);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -187,7 +208,18 @@ const HistoryScreen = () => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={fetchHistory}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
         
         {/* Earnings Overview Card */}
         <LinearGradient
@@ -197,11 +229,11 @@ const HistoryScreen = () => {
           <View style={styles.summaryTop}>
             <View>
               <Text style={styles.summaryLabel}>Overall Earnings</Text>
-              <Text style={styles.summaryAmount}>₹12,450.00</Text>
+              <Text style={styles.summaryAmount}>₹{totalEarnings.toFixed(2)}</Text>
             </View>
             <View style={styles.summaryBadge}>
               <Icon name="trending-up" size={16} color={COLORS.accent} />
-              <Text style={styles.trendingText}>+12%</Text>
+              <Text style={styles.trendingText}>Trips</Text>
             </View>
           </View>
 
@@ -209,17 +241,17 @@ const HistoryScreen = () => {
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>124</Text>
+              <Text style={styles.statValue}>{totalTrips}</Text>
               <Text style={styles.statLabel}>Trips</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>460km</Text>
+              <Text style={styles.statValue}>{totalDistance.toFixed(1)}km</Text>
               <Text style={styles.statLabel}>Distance</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>4.8</Text>
+              <Text style={styles.statValue}>{userData?.rating || '4.8'}</Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
           </View>
@@ -239,29 +271,37 @@ const HistoryScreen = () => {
           <TouchableOpacity key={item.id} style={styles.historyCard} activeOpacity={0.8}>
             <View style={styles.historyCardLeft}>
               <View style={styles.dateIcon}>
-                <Text style={styles.dateDay}>{item.date.split(' ')[0]}</Text>
-                {item.date.includes(',') && <Text style={styles.dateMonth}>{item.date.split(' ')[1]}</Text>}
+                <Text style={styles.dateDay}>
+                  {item.scheduleDate?.includes('/') ? item.scheduleDate.split('/')[0] : 
+                   item.scheduleDate?.includes('-') ? item.scheduleDate.split('-')[2] : '??'}
+                </Text>
+                <Text style={styles.dateMonth}>
+                  {item.scheduleDate?.includes('/') ? item.scheduleDate.split('/')[1] : 
+                   item.scheduleDate?.includes('-') ? item.scheduleDate.split('-')[1] : '??'}
+                </Text>
               </View>
             </View>
 
             <View style={styles.historyInfo}>
               <View style={styles.infoHeader}>
-                <Text style={styles.infoTime}>{item.time}</Text>
-                <Text style={styles.infoAmount}>{item.amount}</Text>
+                <Text style={styles.infoTime}>{item.scheduleTime}</Text>
+                <Text style={styles.infoAmount}>₹{item.totalFare || item.totalTripAmount || '0'}</Text>
               </View>
               
               <View style={styles.routePreview}>
-                <Text style={styles.routeText} numberOfLines={1}>{item.from} → {item.to}</Text>
+                <Text style={styles.routeText} numberOfLines={1}>
+                  {item.pickupAddress || item.pickup} → {item.dropAddress || item.drop}
+                </Text>
               </View>
 
               <View style={styles.rideStats}>
                 <View style={styles.miniStat}>
                   <Icon name="map-marker-distance" size={14} color={COLORS.textMuted} />
-                  <Text style={styles.miniStatText}>{item.distance}</Text>
+                  <Text style={styles.miniStatText}>{item.distanceKm || item.distance || '0'} km</Text>
                 </View>
                 <View style={styles.miniStat}>
                   <Icon name="clock-outline" size={14} color={COLORS.textMuted} />
-                  <Text style={styles.miniStatText}>{item.timeTaken}</Text>
+                  <Text style={styles.miniStatText}>{item.estimatedTime || item.travelTime || 'N/A'}</Text>
                 </View>
                 <View style={[styles.miniStat, { marginLeft: 'auto' }]}>
                   <View style={styles.doneBadge}>

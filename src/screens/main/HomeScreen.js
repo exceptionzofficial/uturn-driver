@@ -17,13 +17,14 @@ import {
   PanResponder,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
-import { getAddressFromCoords } from '../../services/api';
+import { getAddressFromCoords, getAvailableTrips, acceptTrip } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
 import Loader from '../../components/Loader';
 
@@ -31,6 +32,7 @@ const { width } = Dimensions.get('window');
 const SERVICE_CARD_SIZE = (width - SPACING.lg * 2 - SPACING.md) / 2;
 
 const SERVICES = [
+  { id: '9', label: 'Self Drive', image: require('../../assets/selfdrive.png'), color: '#E65100' },
   { id: '1', label: 'Job', image: require('../../assets/job.png'), color: '#4CAF50' },
   { id: '2', label: 'Buy / Sell', image: require('../../assets/Vehicle.png'), color: '#2196F3' },
   { id: '3', label: 'Expense', image: require('../../assets/money.png'), color: '#FF5722' },
@@ -38,7 +40,6 @@ const SERVICES = [
   { id: '5', label: 'Insurance', image: require('../../assets/insurance.png'), color: '#00BCD4' },
   { id: '6', label: 'Referral', image: require('../../assets/referral.png'), color: '#FF9800' },
   { id: '8', label: 'My Earnings', image: require('../../assets/earning.png'), color: '#8BC34A' },
-  { id: '9', label: 'Self Drive', image: require('../../assets/selfdrive.png'), color: '#607D8B' },
 ];
 
 const BANNERS = [
@@ -50,8 +51,7 @@ const BANNERS = [
 
 const BANNER_WIDTH = width - SPACING.lg * 2;
 
-const HomeScreen = () => {
-  const { isOnline, setIsOnline, userData } = useAppContext();
+const HomeScreen = ({ navigation }) => {
   const [locationName, setLocationName] = useState('Locating...');
   const [loading, setLoading] = useState(true);
   const [region, setRegion] = useState({
@@ -63,7 +63,18 @@ const HomeScreen = () => {
   const [showMap, setShowMap] = useState(false);
   const [incomingBooking, setIncomingBooking] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  
+  const [hasActiveTrip, setHasActiveTrip] = useState(false);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const { 
+    isOnline, setIsOnline, userData, 
+    notifications, setNotifications,
+    showNotifModal, setShowNotifModal 
+  } = useAppContext();
+  const insets = useSafeAreaInsets();
+  const declinedTrips = useRef(new Set()).current;
+  const notifiedTrips = useRef(new Set());
+  const prevDriverTripStatuses = useRef({});
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideX = useRef(new Animated.Value(0)).current;
 
@@ -122,12 +133,12 @@ const HomeScreen = () => {
   useEffect(() => {
     requestLocationPermission();
     startEntranceAnimations();
-    
+
     // Simulate initial data loading
     const timer = setTimeout(() => {
       setLoading(false);
     }, 1500);
-    
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -199,32 +210,130 @@ const HomeScreen = () => {
       useNativeDriver: true,
     }).start();
 
-    // Trigger simulation when going online
-    let simulationTimer;
-    if (isOnline) {
-      simulationTimer = setTimeout(() => {
-        setIncomingBooking({
-          id: 'UT-7842',
-          pickup: 'Town Hall, Coimbatore',
-          drop: 'Railway Station, Erode',
-          type: 'One Way',
-          vehicle: 'Premium Sedan',
-          distance: '94.5 km',
-          fare: {
-            base: '1200',
-            distance: '950',
-            bata: '150',
-            total: '2300'
+    // Fetch real published rides when online
+    let pollInterval;
+    const fetchRealRides = async () => {
+      if (isOnline && !hasActiveTrip) {
+        // console.log('[Driver] Polling for available trips...');
+        const trips = await getAvailableTrips();
+        if (trips && trips.length > 0) {
+          const dId = userData?.phone || userData?.driverId;
+
+          trips.forEach(t => {
+            if (t.lastRejectedDriver === dId && !declinedTrips.has(t.tripId + '_notified')) {
+              setNotifications(prev => [{
+                id: Date.now().toString() + Math.random(),
+                title: 'Ride Rejected',
+                message: `Vendor rejected you for trip #${t.tripId?.slice(-6) || t.id?.slice(-6)}. Reason: ${t.rejectReason || 'No reason provided'}`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                read: false
+              }, ...prev]);
+              declinedTrips.add(t.tripId + '_notified');
+              declinedTrips.add(t.tripId); // Filter it out too
+            }
+          });
+
+          const newTrips = trips.filter(t => !declinedTrips.has(t.tripId) && !(t.rejectedDrivers || []).includes(dId));
+          if (newTrips.length > 0) {
+            const latestTrip = newTrips[0]; // Take the newest pending trip
+
+            let dist = latestTrip.distance || latestTrip.distanceKm || '0 km';
+            if (dist === '0 km' || dist === '0') dist = 'TBD';
+
+            // Map backend fields to the UI's expected format
+            setIncomingBooking({
+              id: latestTrip.tripId,
+              pickup: latestTrip.pickupAddress || latestTrip.pickup,
+              drop: latestTrip.dropAddress || latestTrip.drop,
+              type: latestTrip.tripType,
+              vehicle: latestTrip.vehicle || latestTrip.vehicleType,
+              distance: dist,
+              fare: {
+                base: latestTrip.baseFare || '0',
+                distance: latestTrip.distanceCharge || '0',
+                bata: latestTrip.driverBata || '0',
+                total: latestTrip.totalFare || latestTrip.totalAmount || '0'
+              }
+            });
+          } else {
+            setIncomingBooking(null);
           }
-        });
-      }, 3500);
+        } else {
+          setIncomingBooking(null);
+        }
+      }
+    };
+
+    if (isOnline) {
+      fetchRealRides(); // Initial fetch
+      pollInterval = setInterval(fetchRealRides, 5000); // Poll every 5 seconds
     } else {
       setIncomingBooking(null);
+      if (pollInterval) clearInterval(pollInterval);
+    }
+
+    // --- Poll driver's OWN trips for status change notifications ---
+    const dId = userData?.phone || userData?.driverId;
+    let driverTripPollInterval;
+    
+    const pollDriverTripStatus = async () => {
+      if (!dId) return;
+      try {
+        const { getDriverTrips } = require('../../services/api');
+        const myTrips = await getDriverTrips(dId);
+        if (!myTrips) return;
+
+        myTrips.forEach(t => {
+          const tid = t.tripId || t.id;
+          const prev = prevDriverTripStatuses.current[tid];
+          const curr = t.status;
+          const notifKey = `${tid}_${curr}`;
+
+          if ((prev && prev !== curr) || (curr === 'vendorApproved' && !notifiedTrips.current.has(notifKey))) {
+            let title = null, message = null;
+            if (curr === 'vendorApproved') {
+              title = '✅ Ride Approved!';
+              message = `Vendor approved your ride #${tid?.slice(-6)}. Head to pickup now.`;
+            } else if (curr === 'commissionApproved') {
+              title = '💰 Payment Confirmed!';
+              message = `Vendor confirmed receiving payment for ride #${tid?.slice(-6)}. You are free to take new rides!`;
+            } else if (curr === 'commissionRejected') {
+              title = '❌ Payment Rejected';
+              message = `Vendor rejected your payment for ride #${tid?.slice(-6)}. Reason: ${t.commissionRejectReason || 'Check with vendor'}.`;
+            }
+
+            if (title) {
+              setNotifications(prevArr => [{
+                id: Date.now().toString() + Math.random(),
+                title,
+                message,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                read: false
+              }, ...prevArr]);
+              notifiedTrips.current.add(notifKey);
+            }
+          }
+          prevDriverTripStatuses.current[tid] = curr;
+        });
+
+        const activeStatuses = ["driverAccepted", "vendorApproved", "arrived", "inProgress", "dropped"];
+        const activeT = myTrips.find(t => activeStatuses.includes(t.status));
+        const active = !!activeT;
+        setHasActiveTrip(active);
+        setActiveTrip(activeT);
+        if (active) setIncomingBooking(null); // Clear any pending popup if we just became active
+      } catch (e) {}
+    };
+
+    if (dId) {
+      pollDriverTripStatus(); // initial
+      driverTripPollInterval = setInterval(pollDriverTripStatus, 8000);
     }
 
     return () => {
       if (pulse) pulse.stop();
-      if (simulationTimer) clearTimeout(simulationTimer);
+      if (pollInterval) clearInterval(pollInterval);
+      if (driverTripPollInterval) clearInterval(driverTripPollInterval);
     };
   }, [isOnline]);
 
@@ -248,12 +357,11 @@ const HomeScreen = () => {
     })
   ).current;
 
-  const handleAcceptBooking = () => {
-    setShowConfirmModal(false);
+  const handleAcceptBooking = async () => {
+    const acceptedTrip = { ...incomingBooking };
     setIncomingBooking(null);
-    Alert.alert('Booking Accepted!', 'The trip is now assigned to you. Drive safe!', [
-      { text: 'Got it', onPress: () => {} }
-    ]);
+    setShowConfirmModal(false);
+    navigation.navigate('VideoVerification', { trip: acceptedTrip });
   };
 
   const requestLocationPermission = async () => {
@@ -261,18 +369,29 @@ const HomeScreen = () => {
       try {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'UTurn needs access to your location to find nearby rides.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
         );
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           getCurrentLocation();
+          return true;
         } else {
+          Alert.alert('Permission Denied', 'You need to enable location to go LIVE.');
           setLocationName('Permission Denied');
+          return false;
         }
       } catch (err) {
         console.warn(err);
-        setLocationName('Permission Error');
+        return false;
       }
     } else {
       getCurrentLocation();
+      return true;
     }
   };
 
@@ -294,8 +413,10 @@ const HomeScreen = () => {
       },
       (error) => {
         console.log('Location error:', error.code, error.message);
-        // Fallback to a default location display instead of error
-        setLocationName('Tap to set location');
+        if (error.code === 2) {
+          Alert.alert('Location Services Off', 'Please enable GPS/Location services on your device to go LIVE.');
+        }
+        setLocationName('GPS Disabled');
       },
       { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 },
     );
@@ -317,6 +438,15 @@ const HomeScreen = () => {
         <TouchableOpacity
           style={[styles.serviceCard, { borderColor: item.color + '40' }]}
           activeOpacity={0.7}
+          onPress={() => {
+            if (item.label === 'Self Drive') {
+              navigation.navigate('SelfRide');
+            } else if (item.label === 'Job') {
+              navigation.navigate('MyTask');
+            } else {
+              Alert.alert('Coming Soon', `${item.label} feature will be available soon!`);
+            }
+          }}
         >
           <View style={styles.iconContainer}>
             {item.image ? (
@@ -345,7 +475,7 @@ const HomeScreen = () => {
       <View style={styles.bgBlob1} />
       <View style={styles.bgBlob2} />
 
-      <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1, paddingTop: insets.top }}>
         {/* Header - slides down */}
         <Animated.View style={[styles.header, {
           opacity: headerAnim,
@@ -377,12 +507,12 @@ const HomeScreen = () => {
                 ]}>
                   {showHeaderInfo ? (
                     <View>
-                      <Text style={styles.brandText}>UTURN</Text>
+                      <Text style={styles.brandText} numberOfLines={1} adjustsFontSizeToFit>UTURN</Text>
                       <Text style={styles.tagline}>Moving Business Forward</Text>
                     </View>
                   ) : (
                     <View>
-                      <Text style={styles.brandText}>{userData?.vehicleType?.toUpperCase() || 'MY VEHICLE'}</Text>
+                      <Text style={styles.brandText} numberOfLines={1} adjustsFontSizeToFit>{userData?.vehicleType?.toUpperCase() || 'MY VEHICLE'}</Text>
                       <Text style={styles.tagline}>{userData?.vehicleNumber || 'Wait for approval'}</Text>
                     </View>
                   )}
@@ -392,7 +522,14 @@ const HomeScreen = () => {
             <View style={styles.headerRight}>
               {/* Creative 'Beacon' Status Toggle */}
               <TouchableOpacity
-                onPress={() => setIsOnline(!isOnline)}
+                onPress={async () => {
+                  if (!isOnline) {
+                    const status = await requestLocationPermission();
+                    if (status) setIsOnline(true);
+                  } else {
+                    setIsOnline(false);
+                  }
+                }}
                 activeOpacity={0.9}
                 style={styles.beaconToggleContainer}
               >
@@ -454,7 +591,7 @@ const HomeScreen = () => {
                 </Animated.View>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.profileCircle}
                 onPress={() => navigation.navigate('Profile')}
               >
@@ -542,6 +679,52 @@ const HomeScreen = () => {
               ))}
             </View>
           </Animated.View>
+
+          {/* Active Trip Card */}
+          {hasActiveTrip && activeTrip && (
+            <Animated.View style={{
+              marginHorizontal: SPACING.lg,
+              marginTop: 15,
+              marginBottom: 5,
+              opacity: sectionTitleAnim,
+              transform: [{ translateY: sectionTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }]
+            }}>
+              <TouchableOpacity 
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('ActiveRide', { trip: activeTrip })}
+                style={{
+                  backgroundColor: '#E3F2FD',
+                  borderRadius: 20,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#BBDEFB',
+                  ...SHADOW.medium
+                }}
+              >
+                <View style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#2196F3',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12
+                }}>
+                  <Icon name="car-connected" size={24} color="#FFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1976D2', marginBottom: 2 }}>CURRENT ACTIVE RIDE</Text>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: COLORS.text }} numberOfLines={1}>
+                    {activeTrip.isSelfRide ? 'Self Ride In Progress' : (activeTrip.pickupAddress || activeTrip.pickup || 'Trip In Progress')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: COLORS.textMuted }}>Tap to continue ride flow</Text>
+                </View>
+                <Icon name="chevron-right" size={24} color="#2196F3" />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Services title - fades in */}
           <Animated.View style={{
@@ -632,7 +815,7 @@ const HomeScreen = () => {
             </View>
           </View>
         </Modal>
-      </SafeAreaView>
+      </View>
       <Loader visible={loading} message="Syncing data..." />
 
       {/* Booking Notification Modal */}
@@ -705,16 +888,21 @@ const HomeScreen = () => {
             <View style={styles.slideActionContainer}>
               <View style={styles.slideBackground}>
                 <Text style={styles.slideText}>Slide to Accept Ride</Text>
-                <Animated.View 
+                <Animated.View
                   style={[styles.slideThumb, { transform: [{ translateX: slideX }] }]}
                   {...panResponder.panHandlers}
                 >
                   <Icon name="chevron-double-right" size={24} color={COLORS.white} />
                 </Animated.View>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.declineBtn}
-                onPress={() => setIncomingBooking(null)}
+                onPress={() => {
+                  if (incomingBooking) {
+                    declinedTrips.add(incomingBooking.id);
+                  }
+                  setIncomingBooking(null);
+                }}
               >
                 <Text style={styles.declineText}>Decline Ride</Text>
               </TouchableOpacity>
@@ -733,13 +921,13 @@ const HomeScreen = () => {
             <Text style={styles.confirmTitle}>Confirm Acceptance</Text>
             <Text style={styles.confirmDesc}>Are you sure you want to accept this ride? You will be expected at the pickup location shortly.</Text>
             <View style={styles.confirmActions}>
-              <TouchableOpacity 
-                style={[styles.confirmBtn, styles.cancelBtn]} 
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.cancelBtn]}
                 onPress={() => setShowConfirmModal(false)}
               >
                 <Text style={styles.cancelBtnText}>Back</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.confirmBtn, styles.acceptBtn]}
                 onPress={handleAcceptBooking}
               >
@@ -749,6 +937,7 @@ const HomeScreen = () => {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 };

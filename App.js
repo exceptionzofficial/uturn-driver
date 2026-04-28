@@ -19,6 +19,7 @@ import HistoryScreen from './src/screens/main/HistoryScreen';
 import VideoVerificationScreen from './src/screens/main/VideoVerificationScreen';
 import ActiveRideScreen from './src/screens/main/ActiveRideScreen';
 import ProfileScreen from './src/screens/main/ProfileScreen';
+import SelfRideScreen from './src/screens/main/SelfRideScreen';
 import { COLORS, SHADOW } from './src/theme/AppTheme';
 import { AppProvider, useAppContext } from './src/context/AppContext';
 
@@ -232,6 +233,11 @@ const App = () => {
               name="ActingDriverRegister"
               component={ActingDriverRegisterScreen}
               options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="SelfRide"
+              component={SelfRideScreen}
+              options={{ animation: 'slide_from_bottom' }}
             />
           </Stack.Navigator>
         </NavigationContainer>

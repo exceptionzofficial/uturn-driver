@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://a22b-2401-4900-93e4-8fe7-dd94-3335-b9c0-6b69.ngrok-free.app/api'; // Standard Android Emulator Loopback
+const API_BASE_URL = 'https://uturn-nl7u.onrender.com/api/'; // Production URL with trailing slash
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000, // 60s for Render cold start
   headers: {
     'Content-Type': 'application/json',
   },

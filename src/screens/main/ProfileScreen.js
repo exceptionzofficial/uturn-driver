@@ -82,10 +82,16 @@ const ProfileScreen = ({ navigation }) => {
                 { translateY: avatarAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }
               ]
             }]}>
-              <Image
-                source={{ uri: userData?.profilePhoto || 'https://via.placeholder.com/150' }}
-                style={styles.avatar}
-              />
+              {userData?.profilePhoto ? (
+                <Image
+                  source={{ uri: userData.profilePhoto.startsWith('http') ? userData.profilePhoto : `https://uturn-nl7u.onrender.com${userData.profilePhoto}` }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F0F0' }]}>
+                  <Icon name="account" size={60} color={COLORS.textLight} />
+                </View>
+              )}
             </Animated.View>
 
             <Text style={styles.userName}>{userData?.name || 'Driver Name'}</Text>

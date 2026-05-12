@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SHADOW, SPACING } from '../../theme/AppTheme';
 import { createSelfRide } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 
 const { width } = Dimensions.get('window');
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAs3nkKoCsndZiXeV6oh0PvRLL7FpMiZ4k';
@@ -45,7 +46,8 @@ const RENTAL_TYPES = [
 const LANGUAGES = ['Tamil', 'English', 'Hindi', 'Telugu', 'Malayalam', 'Kannada', 'Others'];
 
 const SelfRideScreen = ({ navigation }) => {
-  const [userData, setUserData] = useState(null);
+  // Use AppContext userData — same source as TripsScreen so driverId matches
+  const { userData } = useAppContext();
   const [loading, setLoading] = useState(false);
   const searchTimer = useRef(null);
   const mapRef = useRef(null);
@@ -88,28 +90,32 @@ const SelfRideScreen = ({ navigation }) => {
   const [activeField, setActiveField] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Set user vehicle automatically on mount
+  // Auto-set vehicle type from userData (AppContext) on mount
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const res = await AsyncStorage.getItem('user_data');
-        if (res) {
-          const user = JSON.parse(res);
-          setUserData(user);
-          const v = user.vehicleType || user.vehicle || 'Sedan';
-          const vData = VEHICLE_TYPES.find(x => x.name === v);
-          if (vData) {
-            setFormData(prev => ({
-              ...prev,
-              vehicle: v,
-              category: vData.category,
-            }));
-          }
-        }
-      } catch (e) {}
-    };
-    loadUser();
-  }, []);
+    if (userData) {
+      const v = userData.vehicleType || userData.vehicle || 'Sedan';
+      const vData = VEHICLE_TYPES.find(x => x.name === v);
+      
+      // Default passenger logic:
+      // Bike: 1 passenger (Total 2)
+      // Auto: 2 passengers (Total 3)
+      // Sedan: 4 passengers (Total 5)
+      // SUV: 6 passengers (Total 7)
+      let defaultPeople = 1;
+      if (v === 'Auto') defaultPeople = 2;
+      if (v === 'Sedan') defaultPeople = 4;
+      if (v === 'SUV') defaultPeople = 6;
+
+      if (vData) {
+        setFormData(prev => ({
+          ...prev,
+          vehicle: v,
+          category: vData.category,
+          numberOfPeople: defaultPeople
+        }));
+      }
+    }
+  }, [userData]);
 
   // Total Fare Auto-calculate Effect
   useEffect(() => {
@@ -309,7 +315,7 @@ const SelfRideScreen = ({ navigation }) => {
            status: 'driverAccepted',
          };
          Alert.alert('Trip Created', 'Self ride created! You can see it in your active rides.', [
-           { text: 'Go to Trips', onPress: () => navigation.navigate('MyTask') }
+           { text: 'Go to Trips', onPress: () => navigation.navigate('MainTabs', { screen: 'MyTask' }) }
          ]);
       } else {
          Alert.alert('Error', 'Failed to publish trip');
@@ -403,7 +409,19 @@ const SelfRideScreen = ({ navigation }) => {
                   <Icon name="minus-circle-outline" size={28} color={COLORS.primary} />
                 </TouchableOpacity>
                 <Text style={styles.counterValue}>{formData.numberOfPeople}</Text>
-                <TouchableOpacity onPress={() => setFormData({ ...formData, numberOfPeople: formData.numberOfPeople + 1 })}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const maxP = formData.vehicle === 'Bike' ? 1 : 
+                               formData.vehicle === 'Auto' ? 3 : 
+                               formData.vehicle === 'Sedan' ? 4 : 
+                               formData.vehicle === 'SUV' ? 7 : 10;
+                    if (formData.numberOfPeople < maxP) {
+                      setFormData({ ...formData, numberOfPeople: formData.numberOfPeople + 1 });
+                    } else {
+                      Alert.alert('Capacity Reached', `A ${formData.vehicle} can only carry up to ${maxP} passengers.`);
+                    }
+                  }}
+                >
                   <Icon name="plus-circle-outline" size={28} color={COLORS.primary} />
                 </TouchableOpacity>
               </View>

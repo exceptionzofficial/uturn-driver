@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
 // Production Backend URL
 const API_BASE = 'https://uturn-nl7u.onrender.com/api';
@@ -69,12 +70,35 @@ export const generateRideOtp = async (tripId) => {
   }
 };
 
-// ── OTP — Start Trip ───────────────────────────────────────────
+// ── OTP — Verify (plain JSON, no multipart) ───────────────────
+export const verifyRideOtp = async (tripId, otp) => {
+  try {
+    const response = await apiClient.post(`/bookings/${tripId}/verify-otp`, {
+      otp: String(otp),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    throw error;
+  }
+};
+
 export const startTrip = async (tripId, otp, extraData = {}) => {
   try {
-    const response = await apiClient.post(`/bookings/${tripId}/start`, { 
-      otp: String(otp),
-      startKm: extraData.startKm || 0,
+    const formData = new FormData();
+    formData.append('otp', String(otp));
+    formData.append('startKm', extraData.startKm || 0);
+    
+    if (extraData.odometerPhoto) {
+      formData.append('odometerPhoto', {
+        uri: Platform.OS === 'android' ? extraData.odometerPhoto : extraData.odometerPhoto.replace('file://', ''),
+        type: 'image/jpeg',
+        name: `start_odometer_${tripId}.jpg`,
+      });
+    }
+
+    const response = await apiClient.post(`/bookings/${tripId}/start`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   } catch (error) {
@@ -94,18 +118,25 @@ export const updateStatus = async (tripId, status) => {
   }
 };
 
-// ── Drop Customer (extra charges + odometer → server calculates final fare)
 export const dropCustomer = async (tripId, charges) => {
   try {
-    const response = await apiClient.post(`/bookings/${tripId}/drop`, {
-      tollCharges:    charges.tollCharges    || 0,
-      parkingCharges: charges.parkingCharges || 0,
-      permitCharges:  charges.permitCharges  || 0,
-      otherCharges:   charges.otherCharges   || 0,
-      waitCharges:    charges.waitCharges    || 0,
-      startKm:        charges.startKm        || 0,
-      endKm:          charges.endKm          || 0,
-      distanceKm:     charges.distanceKm     || 0,
+    const formData = new FormData();
+    Object.keys(charges).forEach(key => {
+      if (key !== 'odometerPhoto') {
+        formData.append(key, charges[key]);
+      }
+    });
+
+    if (charges.odometerPhoto) {
+      formData.append('odometerPhoto', {
+        uri: Platform.OS === 'android' ? charges.odometerPhoto : charges.odometerPhoto.replace('file://', ''),
+        type: 'image/jpeg',
+        name: `end_odometer_${tripId}.jpg`,
+      });
+    }
+
+    const response = await apiClient.post(`/bookings/${tripId}/drop`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   } catch (error) {

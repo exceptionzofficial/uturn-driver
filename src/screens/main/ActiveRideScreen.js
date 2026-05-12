@@ -6,13 +6,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import SwipeButton from 'rn-swipe-button';
-import ImageResizer from 'react-native-image-resizer';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme/AppTheme';
-import { startTrip, dropCustomer, completeTrip, updateStatus, triggerSOS } from '../../services/api';
+import { startTrip, dropCustomer, completeTrip, updateStatus, triggerSOS, verifyRideOtp } from '../../services/api';
 import ImagePicker from 'react-native-image-crop-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Loader from '../../components/Loader';
 
 const STAGE = {
   WAY_TO_PICKUP:  'wayToPickup',
@@ -71,6 +71,7 @@ const ActiveRideScreen = ({ navigation, route }) => {
   // Final billing state
   const [finalData, setFinalData] = useState(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Self ride specific
   const [selfRideOtp, setSelfRideOtp] = useState(null);
@@ -253,7 +254,16 @@ const ActiveRideScreen = ({ navigation, route }) => {
       if (!isSelfRide && enteredOtp === '0000') {
         // Bypass for vendor rides testing only
         setStage(STAGE.START_ODOMETER);
+      } else if (isSelfRide) {
+        // Self rides: use dedicated JSON endpoint (not multipart FormData)
+        const res = await verifyRideOtp(tripId, enteredOtp);
+        if (res?.success) {
+          setStage(STAGE.START_ODOMETER);
+        } else {
+          setOtpError(res?.message || 'Incorrect OTP. Please check with customer.');
+        }
       } else {
+        // Vendor rides: use startTrip (multipart)
         const res = await startTrip(tripId, enteredOtp);
         if (res?.success) {
           setStage(STAGE.START_ODOMETER);
@@ -270,48 +280,62 @@ const ActiveRideScreen = ({ navigation, route }) => {
 
   const takePhoto = async (setPhotoFn) => {
     try {
-      const img = await ImagePicker.openCamera({ 
-        cropping: false, 
-        compressImageQuality: 0.7,
-        maxWidth: 1200,
-        maxHeight: 1200
+      const img = await ImagePicker.openCamera({
+        cropping: false,
+        compressImageQuality: 0.5,
+        compressImageMaxWidth: 800,
+        compressImageMaxHeight: 600,
+        includeBase64: false,
+        mediaType: 'photo',
       });
-      
-      // Secondary compression using ImageResizer to be extra safe
-      const resized = await ImageResizer.createResizedImage(
-        img.path,
-        1000,
-        1000,
-        'JPEG',
-        80,
-        0
-      );
-      
-      setPhotoFn(resized.uri);
+      setPhotoFn(img.path);
     } catch (e) {
-      if (e.code !== 'E_PICKER_CANCELLED') Alert.alert('Error', 'Failed to capture and process image. Please try again.');
+      if (e.message !== 'User cancelled image selection' && e.code !== 'E_PICKER_CANCELLED') {
+        Alert.alert('Camera Error', 'Could not access camera or capture image.');
+      }
     }
   };
 
   const startTheRide = async () => {
-    if (!startPhoto || !startKm) {
-      Alert.alert('Required', 'Please take an odometer photo and enter the reading.');
+    if (!startKm) {
+      Alert.alert('Required', 'Please enter the odometer reading.');
       return;
     }
-    // Save startKm to backend
+
+    setIsLoading(true);
     try {
-      await updateStatus(tripId, 'inProgress');
-    } catch (e) {
-      console.warn('Status update warning:', e);
+      // Send odometer data to backend
+      const res = await startTrip(tripId, enteredOtp, {
+        startKm: startKm,
+        odometerPhoto: startPhoto
+      });
+
+      if (res?.success) {
+        const now = new Date();
+        setStartTimeLabel(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setStage(STAGE.TRIP_STARTED);
+        
+        // Save state
+        const state = {
+          stage: STAGE.TRIP_STARTED,
+          startTimeLabel: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          startKm,
+          startPhoto
+        };
+        await AsyncStorage.setItem(`@active_ride_${tripId}`, JSON.stringify(state));
+      } else {
+        Alert.alert('Error', res?.message || 'Failed to start trip on server.');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not connect to server.');
+    } finally {
+      setIsLoading(false);
     }
-    const now = new Date();
-    setStartTimeLabel(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    setStage(STAGE.TRIP_STARTED);
   };
 
   const handleConfirmDrop = async () => {
-    if (!endPhoto || !endKm) {
-      Alert.alert('Required', 'Please take an end odometer photo and enter the reading.');
+    if (!endKm) {
+      Alert.alert('Required', 'Please enter the end odometer reading.');
       return;
     }
     const startNum = parseFloat(startKm) || 0;
@@ -336,6 +360,7 @@ const ActiveRideScreen = ({ navigation, route }) => {
         startKm:        startNum,
         endKm:          endNum,
         distanceKm:     dist,
+        odometerPhoto:  endPhoto,
       });
       if (res?.success) {
         setFinalData(res.data);
@@ -871,6 +896,7 @@ const ActiveRideScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {renderChargesModal()}
+      <Loader visible={isLoading} message="Processing trip..." />
     </SafeAreaView>
   );
 };
